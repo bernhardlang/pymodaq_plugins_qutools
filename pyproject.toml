@@ -1,0 +1,26 @@
+[plugin-info]
+SHORT_PLUGIN_NAME = 'qutools'
+
+package-url = 'https://github.com/bernhardlang/pymodaq_plugins_qutools'
+description = 'python wrapper for quTools qutag device'
+
+author = 'Bernhard Lang'
+author-email = 'bernhard.lang@gmx.ch'
+license = 'MIT'
+
+[plugin-install]
+packages-required = ['pymodaq>=4.3.0']
+
+[features]
+instruments = true
+extensions = false
+models = false
+h5exporters = false
+scanners = false
+
+[project]
+name = "pymodaq_plugins_qutools"
+version = "0.1"
+
+[project.entry-points."pymodaq.plugins"]
+'qutools' = 'pymodaq_plugins_qutools'
