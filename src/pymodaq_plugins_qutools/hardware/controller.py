@@ -120,13 +120,7 @@ class QutagController:
             self.init_tagging()
 
 
-class QutagControllerSimu:
-
-    def connect(self):
-        pass
-
-    def disconnect(self):
-        pass
+class QutagControllerSimu(QutagController):
 
     def grab_hist(self, seconds):
         diffs = np.random.normal(self.delay, self.jitter,
