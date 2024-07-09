@@ -8,21 +8,14 @@ from pymodaq_plugins_qutools.hardware.controller import QutagController
 
 
 class DAQ_1DViewer_Qutag_hist(DAQ_Viewer_base):
-    """ Instrument plugin class for a 1D viewer.
+    """ Instrument plugin class for a 1D viewer of a quTAG device from
+        qutools https://qutools.com/qutag-hr
 
-    This object inherits all functionalities to communicate with PyMoDAQ’s
-    DAQ_Viewer module through inheritance via DAQ_Viewer_base. It makes a
-    bridge between the DAQ_Viewer module and the Python wrapper of a
-    particular instrument.
-
-    TODO Complete the docstring of your plugin with:
-        * The set of instruments that should be compatible with this
-         instrument plugin.
-        * With which instrument it has actually been tested.
-        * The version of PyMoDAQ during the test.
-        * The version of the operating system.
-        * Installation instructions: what manufacturer’s drivers should be
-          installed to make it run?
+    Tested on verion 2 of the device using python 3.10.14 and
+    PyMoDAQ 4.3.x_dev under Debian 12.5
+    Needed are library libtdcbase.so / tdcbase.dll and the file
+    QuTAG_HR.py in the python examples provided py qutools. Copy both latter
+    into the hardware directory.
 
     Attributes:
     -----------
@@ -36,12 +29,16 @@ class DAQ_1DViewer_Qutag_hist(DAQ_Viewer_base):
     hw_params = [
         { 'title': 'Number of bins', 'name': 'n_bins', 'type': 'int', 'min': 1,
           'value': 100 },
-        { 'title': 'Histogram start', 'name': 'start_hist', 'type': 'float',
-          'min': -1e-3, 'max': 1e-3, 'value': -2e-6 },
-        { 'title': 'Histogram end', 'name': 'end_hist', 'type': 'float',
-          'min': -1e-3, 'max': 1e-3, 'value': 2e-6 },
+        { 'title': 'Histogram start', 'name': 'hist_start', 'type': 'float',
+          'min': -1e-3, 'max': 1e-3, 'value': -1e-5 },
+        { 'title': 'Histogram end', 'name': 'hist_end', 'type': 'float',
+          'min': -1e-3, 'max': 1e-3, 'value': 1e-5 },
         ]
-    params = comon_parameters+hw_params
+
+    params = comon_parameters+hw_params+[
+        { 'title': 'Acquisition time (s)', 'name': 'acqisition_time',
+          'type': 'float', 'min': 1e-3, 'max': 10, 'value': 1 },
+        ]
 
     hw_param_names = [param['name'] for param in hw_params]
 
@@ -64,8 +61,7 @@ class DAQ_1DViewer_Qutag_hist(DAQ_Viewer_base):
             A given parameter (within detector_settings) whose value has
             been changed by the user
         """
-        ## TODO for your custom plugin
-        if param.name() in hw_param_names:
+        if param.name() in self.hw_param_names:
             setattr(self.controller, param.name(), param.value())
             self.controller.update_hist()
             self.emit_axis()
@@ -92,8 +88,8 @@ class DAQ_1DViewer_Qutag_hist(DAQ_Viewer_base):
         if self.is_master:
             self.controller.connect()
 
-        for name in hw_param_names:
-            setattr(self.controller, name, self.settings[name]))
+        for name in self.hw_param_names:
+            setattr(self.controller, name, self.settings[name])
         self.controller.update_hist()
         self.emit_axis()
 
@@ -129,7 +125,7 @@ class DAQ_1DViewer_Qutag_hist(DAQ_Viewer_base):
         kwargs: dict
             others optionals arguments
         """
-        hist = self.controller.grab_hist()
+        hist = self.controller.grab_hist(self.settings['acqisition_time'])
         dfp = [DataFromPlugins(name='qutag', data=hist, dim='Data1D',
                                labels=['hist'], axes=[self.x_axis])]
         self.dte_signal.emit(DataToExport('qutag', data=dfp))

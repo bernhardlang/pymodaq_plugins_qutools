@@ -19,14 +19,19 @@
 # @mainpage quTAG Python Wrapper for DLL usage
 #
 # @section description_main Description
-# The Python script quTAG_MC*.py wrapps all DLL functions of the quTAG DLL tdcbase*.dll \n
-# Tdcbase is a library that allows custom programming for the TDC time-to-digital converter. It allows to configure the device, aquire timestamps, and calculate start stop histograms. \n
-# The quTAG_MC*.py wrapps these DLL functions in the class QuTAG by its own Python functions.
+# The Python script quTAG_MC*.py wrapps all DLL functions of the quTAG DLL
+# tdcbase*.dll \n
+# Tdcbase is a library that allows custom programming for the TDC
+# time-to-digital converter. It allows to configure the device, aquire
+# timestamps, and calculate start stop histograms. \n
+# The quTAG_MC*.py wrapps these DLL functions in the class QuTAG by its own
+# Python functions.
 # 
 #
 # @section notes_main Notes
 # - Ensure to match Python bit version with DLL bit version
-# - Import the wrapper quTAG*.py in your script and initialize the quTAG by e.g. qutag = QuTAG.QuTAG()
+# - Import the wrapper quTAG*.py in your script and initialize the quTAG
+#   by e.g. qutag = QuTAG.QuTAG()
 # - Tested with Python3 and Windows 10 (32bit & 64bit)
 # - See also the different example files for usage
 # - Author: qutools GmbH, May 2021
@@ -38,9 +43,8 @@
 
 import ctypes
 import os, sys
-import pathlib
 import numpy as np
-
+import pathlib
 
 class QuTAG:
     # ----------------------------------------------------
@@ -72,9 +76,10 @@ class QuTAG:
         """
         file_path = os.path.dirname(os.path.abspath(__file__))
         if os.name == 'posix':
+            lib_name = 'libtdcbase.so'
             current_path = pathlib.Path(__file__).parent.resolve()
             self.qutools_dll = \
-                ctypes.cdll.LoadLibrary("%s/libtdcbase.so" % (str(current_path)))
+                    ctypes.cdll.LoadLibrary('%s/%s' % (current_path, lib_name))
         else:
             dll_name = 'tdcbase.dll'
             # check Python bit version
@@ -98,6 +103,7 @@ class QuTAG:
         self.dev_nr=-1
         
         # Find and connect to quTAG device
+        print("Initialize and Start with quTAG device: ", self.err_dict[self.Initialize()] )
         
         self._bufferSize = 1000000
         self.setBufferSize(self._bufferSize)

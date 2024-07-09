@@ -1,5 +1,7 @@
 import time
 import numpy as np
+from threading import Thread
+from queue import Queue
 from pymodaq_plugins_qutools.hardware.QuTAG_HR import QuTAG
 
 
@@ -7,64 +9,115 @@ class QutagController:
 
     def __init__(self):
         self.device = None
+        self.report_queue_size = False
+        self.data_queue = Queue()
 
     def connect(self):
         if self.device is not None:
             raise RuntimeError("qutag device already initialised")
         self.device = QuTAG()
-        self.qutag.enableChannels(True)
-        self.qutag.setExposureTime(100)
+        self.device.enableChannels(True)
 
     def disconnect(self):
         if self.device is not None:
             self.device.deInitialize()
             self.device = None
 
-    def controller.update_hist(self):
+    def update_hist(self):
         self.hist_step = (self.hist_end - self.hist_start) / self.n_bins
 
+    def init_tagging(self):
+        self.fs = [None, None]
+        self.ps = None
+
     def grab_hist(self, seconds):
+
+        def add_to_hist(diff):
+            diffs.append(diff)
+
         end = time.time() + seconds
         diffs = []
-        self.start = None
+        self.init_tagging()
         while time.time() < end:
-            tags = qutag.getLastTimestamps(reset=True)
-            if self.process_tags(tags):
-                diffs.append(ps - fs)
+            tags = self.device.getLastTimestamps(reset=True)
+            self.process_tags(tags, add_to_hist)
 
         hist = np.zeros(self.n_bins)
         for item in diffs:
-            idx = min(item - self.hist_start) / self.hist_step, self.hist_end)
+            idx = min(int((item - self.hist_start) / self.hist_step),
+                      self.n_bins - 1)
             hist[max(idx, 0)] += 1
 
         return hist
 
-    def tagger_loop(self):
-        self.start = None
-        self.stop = False
+    def grab_item(self): # dummy for now
         # << clear tagger buffer
-        while not self.stop:
-            tags = qutag.getLastTimestamps(reset=True)
-            if self.process_tags(tags):
-                self.callback(ps - fs)
+        print("grabbing item")
 
-    def process_tags(self, tags):
-        for i,channel in enumerate(tags[1]):
-            if self.start is None:
-                if channel == 0:
-                    self.start = tags[0][i]
-                    self.fs = None
-                    self.ps = None
+        def get_tag(tag):
+            self.diff = tag
+
+        self.diff = None
+        self.init_tagging()
+        while self.diff is None:
+            tags = self.device.getLastTimestamps(reset=True)
+            self.process_tags(tags, get_tag)
+        return self.diff
+
+    def start_tagging(self, callback):
+        if hasattr(self, 'thread') and self.thread.is_alive():
+            return
+        self.callback = callback
+        self.stop = False
+        self.thread = Thread(target=self.tagger_loop)
+        self.thread.start()
+
+    def stop_tagging(self):
+        self.stop = True
+        if self.thread.is_alive():
+            self.thread.join()
+
+    def tagger_loop(self):
+        # << clear tagger buffer
+        count = 0
+        def store_tag(tag):
+            self.data_queue.put(tag)
+        self.init_tagging()
+        while not self.stop:
+            tags = self.device.getLastTimestamps(reset=True)
+            self.process_tags(tags, store_tag)
+            rc = self.device.getDataLost()
+            if rc:
+                print("Data loss", rc)
+            qs = self.data_queue.qsize()
+            if qs:
+                if self.report_queue_size:
+                    self.callback(self.data_queue.get(), qs)
+                    print(count)
+                    count += 1
+                else:
+                    self.callback(self.data_queue.get())
+
+    def process_tags(self, tags, callback):
+        for i in range(tags[2]):
+            value = int(tags[0][i])
+            channel = tags[1][i]
+            if channel == 0:
+                if self.fs[0] is None:
+                    self.fs[0] = value
+                elif self.fs[1] is None:
+                    self.fs[1] = value
             elif channel == 1:
-                if self.ps is None: # should never be other then None
-                    self.ps = int(results[0][i])
-            elif channel == 2:
-                if self.fs is None:
-                    self.fs = int(results[0][i])
-            if self.fs is None or self.ps is None:
-                return False
-            self.start = None
-            return True
+                if self.ps is None:
+                    self.ps = value
+            else: # glitch
+                continue
+
+            if self.fs[0] is None or self.fs[1] is None or self.ps is None:
+                continue
+
+            callback((self.ps - min(self.fs)) * 1e-12)
+            self.init_tagging()
 
 
 class QutagControllerSimu:
@@ -80,7 +133,7 @@ class QutagControllerSimu:
                                  int(self.rep_rate * seconds))
         hist = np.zeros(self.n_bins)
         for item in diffs:
-            idx = min(item - self.hist_start) / self.hist_step, self.hist_end)
+            idx = min((item - self.hist_start) / self.hist_step, self.hist_end)
             hist[max(idx, 0)] += 1
 
     def tagger_loop(self):
