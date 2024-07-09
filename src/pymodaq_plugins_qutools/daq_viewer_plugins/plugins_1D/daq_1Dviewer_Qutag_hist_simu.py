@@ -1,13 +1,9 @@
-import numpy as np
-from pymodaq.utils.daq_utils import ThreadCommand
-from pymodaq.utils.data import DataFromPlugins, Axis, DataToExport
-from pymodaq.control_modules.viewer_utility_classes import DAQ_Viewer_base, \
-    comon_parameters, main
-from pymodaq.utils.parameter import Parameter
-from pymodaq_plugins_qutools.hardware.controller import QutagController
+from pymodaq_plugins_qutools.daq_viewer_plugins.plugins_1D \
+    import daq_1Dviewer_Qutag_hist
+from pymodaq_plugins_qutools.hardware.controller import QutagControllersimu
 
 
-class DAQ_1DViewer_Qutag_hist(DAQ_Viewer_base):
+class DAQ_1DViewer_Qutag_hist_simu(daq_1Dviewer_Qutag_hist):
     """ Instrument plugin class for a 1D viewer.
 
     This object inherits all functionalities to communicate with PyMoDAQ’s
@@ -34,6 +30,7 @@ class DAQ_1DViewer_Qutag_hist(DAQ_Viewer_base):
 
     """
     hw_params = [
+        ...
         { 'title': 'Number of bins', 'name': 'n_bins', 'type': 'int', 'min': 1,
           'value': 100 },
         { 'title': 'Histogram start', 'name': 'start_hist', 'type': 'float',
