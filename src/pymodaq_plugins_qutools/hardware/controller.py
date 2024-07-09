@@ -79,7 +79,6 @@ class QutagController:
 
     def tagger_loop(self):
         # << clear tagger buffer
-        count = 0
         def store_tag(tag):
             self.data_queue.put(tag)
         self.init_tagging()
@@ -93,8 +92,6 @@ class QutagController:
             if qs:
                 if self.report_queue_size:
                     self.callback(self.data_queue.get(), qs)
-                    print(count)
-                    count += 1
                 else:
                     self.callback(self.data_queue.get())
 
