@@ -35,15 +35,15 @@ class DAQ_1DViewer_Qutag_hist_simu(DAQ_1DViewer_Qutag_hist):
     # TODO add your particular attributes here if any
 
     """
-    hw_params = [
-        { 'title': 'Number of bins', 'name': 'n_bins', 'type': 'int', 'min': 1,
-          'value': 100 },
-        { 'title': 'Histogram start', 'name': 'start_hist', 'type': 'float',
-          'min': -1e-3, 'max': 1e-3, 'value': -2e-6 },
-        { 'title': 'Histogram end', 'name': 'end_hist', 'type': 'float',
-          'min': -1e-3, 'max': 1e-3, 'value': 2e-6 },
+    simu_params = [
+        { 'title': 'Delay', 'name': 'delay', 'type': 'float', 'min': -1e-3,
+          'value': 1e-3 },
+        { 'title': 'Jitter', 'name': 'jitter', 'type': 'float',
+          'min': 0, 'max': 1e-4, 'value': 2e-6 },
         ]
-#    params = daq_1Dviewer_Qutag_hist.params
+    params = daq_1Dviewer_Qutag_hist.params + simu_params
+    hw_param_names = DAQ_1DViewer_Qutag_hist.hw_param_names \
+        + [param['name'] for param in simu_params]
 
     controller_type = QutagControllerSimu
 

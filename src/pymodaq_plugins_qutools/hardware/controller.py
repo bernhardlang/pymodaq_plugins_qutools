@@ -132,3 +132,6 @@ class QutagControllerSimu(QutagController):
         while not self.stop:
             diff = self.data_queue.get()
             self.callback(diff)
+
+    def connect(self):
+        pass
