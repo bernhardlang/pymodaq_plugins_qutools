@@ -195,21 +195,6 @@ class DAQ_0DViewer_Qutag(DAQ_Viewer_base):
         self.emit_status(ThreadCommand('Update_Status', ['quTAG halted']))
         return ''
 
-####
-
-#    def callback(self, data):
-#        if self.unit == 'ns':
-#            data[0] *= 1e-3
-#            data[1] *= 1e-3
-#        elif self.unit == 'µs':
-#            data[0] *= 1e-6
-#            data[1] *= 1e-6
-#        mean = DataFromPlugins(name='qutag', data=data[0], dim='Data0D',
-#                               labels=['mean'])
-#        sigma = DataFromPlugins(name='qutag', data=data[1], dim='Data0D',
-#                              labels=['sigma'])
-#        self.dte_signal.emit(DataToExport(name='qutools', data=[mean, sigma]))
-
 
 if __name__ == '__main__':
     from PyQt5.QtCore import pyqtRemoveInputHook
