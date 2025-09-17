@@ -12,11 +12,7 @@ class DAQ_0DViewer_Qutag(DAQ_Viewer_base):
     """ Instrument plugin class for a quTAG OD viewer.
     """
 
-    channel_settings = [
-        { 'title': 'Enabled?', 'name': 'enabled', 'type': 'bool',
-          'value': True },
-        { 'title': 'Get Count Rate?', 'name': 'get_count_rate', 'type': 'bool',
-          'value': False },
+    conditioning = [
         { 'title': 'Signal Conditioning', 'name': 'signal_cond', 'type': 'list',
           'limits': ['LVTTL', 'NIM', 'Misc'] },
         { 'title': 'Trigger Edge', 'name': 'trigger_edge', 'type': 'list',
@@ -25,11 +21,27 @@ class DAQ_0DViewer_Qutag(DAQ_Viewer_base):
           'type': 'float', 'min': -2, 'max': 3 },
     ]
     
+    channel_settings = conditioning + [
+        { 'title': 'Enabled?', 'name': 'enabled', 'type': 'bool',
+          'value': True },
+        { 'title': 'Get Count Rate?', 'name': 'get_count_rate', 'type': 'bool',
+          'value': False },
+    ]
+    
+    start_settings = conditioning + [
+        { 'title': 'Enabled?', 'name': 'enabled', 'type': 'bool',
+          'value': True },
+    ]
+    
     params = comon_parameters+[
+        { 'title': 'Update Interval [s]', 'name': 'update_interval',
+          'type': 'float', 'value': 1 },
+        { 'title': 'Grab all enabled channels?', 'name': 'grab_enabled',
+          'type': 'bool', 'value': True },
         { 'title': 'Line Settings', 'name': 'line_settings', 'type': 'group',
           'expanded': False, 'children': [
               { 'title': 'Start', 'name': 'settings_start', 'type': 'group',
-                'expanded': False, 'children': channel_settings},
+                'expanded': False, 'children': start_settings},
               { 'title': 'Ch1', 'name': 'settings_ch1', 'type': 'group',
                 'expanded': False, 'children': channel_settings},
               { 'title': 'Ch2', 'name': 'settings_ch2', 'type': 'group',
@@ -72,6 +84,10 @@ class DAQ_0DViewer_Qutag(DAQ_Viewer_base):
             A given parameter (within detector_settings) whose value has been
             changed by the user
         """
+        if param.name() == "update_interval":
+            self.controller.set_update_interval(param.value())
+            return
+
         channel = self.get_channel(param.parent().name())
         if channel < 0:
             return
@@ -79,10 +95,7 @@ class DAQ_0DViewer_Qutag(DAQ_Viewer_base):
         if param.name() == "enabled":
             self.controller.enable_channel(channel, param.value())
         elif param.name() == "get_count_rate":
-            self.controller.channel_active[channel] = 1 if param.value() else 0
-            self.active_channel_list = \
-                ['channel %d' % c for c,active in \
-                 enumerate(self.controller.channel_active) if active]
+            self.controller.get_count_rate[channel] = 1 if param.value() else 0
         elif param.name() == "signal_cond":
             self.controller.set_signal_conditioning(channel, param.value())
         elif param.name() == "trigger_edge":
@@ -108,7 +121,8 @@ class DAQ_0DViewer_Qutag(DAQ_Viewer_base):
 
         if self.is_master:
             self.controller = QuTAGController()
-            self.controller.open_communication()
+            update_interval = self.settings.child('update_interval').value()
+            self.controller.open_communication(update_interval)
             initialized = self.controller.is_initialised()
         else:
             self.controller = controller
@@ -142,6 +156,12 @@ class DAQ_0DViewer_Qutag(DAQ_Viewer_base):
         if self.is_master:
             self.controller.close_communication()
 
+    def activate_grabbing(self, channel, enable):
+        channel_key = ('settings_ch%d' % channel) if channel \
+            else 'settings_start'
+        self.settings.child("line_settings").child(channel_key)\
+            .child('get_count_rate').setValue(enable)
+
     def grab_data(self, Naverage=1, **kwargs):
         """Start a grab from the detector
 
@@ -155,9 +175,16 @@ class DAQ_0DViewer_Qutag(DAQ_Viewer_base):
             others optionals arguments
         """
         if self.controller.thread is None:
-            self.controller.start_grabbing()
+            if self.settings.child("grab_enabled").value():
+                for channel in range(1,9):
+                    if self.controller.get_enabled(channel):
+                        self.activate_grabbing(channel, True)
+                        self.controller.get_count_rate[channel-1] = 1
+            self.active_channel_list = \
+                self.controller.start_grabbing(self.callback)
+        return
 
-        data = self.controller.get_rates()
+    def callback(self, data):
         dfp = DataFromPlugins(name='qutag', data=data, dim='Data0D',
                               labels=self.active_channel_list)
         self.dte_signal.emit(DataToExport(name='qutag', data=[dfp]))

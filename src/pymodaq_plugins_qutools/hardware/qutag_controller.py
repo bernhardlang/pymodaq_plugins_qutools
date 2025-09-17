@@ -4,6 +4,10 @@ from pymodaq_plugins_qutools.hardware.QuTAG_HR import QuTAG
 
 import time
 
+def replace_char(string, pos, char):
+    return string[:pos] + char + string[pos+1:]
+# Could simply be string[pos] = char. However, in Python some features are
+# simply broken by design :-/
 
 class QuTAGController:
 
@@ -12,15 +16,11 @@ class QuTAGController:
     SCOND_MISC  = 3
      
     def __init__(self):
-        self.initialised     = False
-        self.thread          = None
-        self.channel_active  = np.zeros(9, dtype=np.int32) # 0-8
-#        self.samples         = [None for _ in range(8)]
-#        self.max_samples     = np.full(8, 500, dtype=np.int32)
-#        self.n_samples       = np.zeros(8, dtype=np.int32)
-#        self.n_bins          = np.full(8, 20, dtype=np.int32)
-#        self.callback        = [None for _ in range(8)]
-        self.active_channels = 0
+        self.initialised = False
+        self.thread = None
+        self.callback = None
+        self.get_count_rate = np.zeros(8, dtype=np.int32)
+        self.sample_count = np.zeros(8, dtype=np.int32)
 
     def __del__(self):
         if self.thread is not None:
@@ -28,11 +28,12 @@ class QuTAGController:
         if self.initialised:
             self.qutag.deInitialize()
 
-    def open_communication(self):
+    def open_communication(self, update_interval):
         try:
             self.qutag = QuTAG()
         except:
             raise RuntimeError("Couldn't initialise QuTAG")
+        self.update_interval = update_interval
         self.initialised = True
 
     def close_communication(self):
@@ -40,32 +41,33 @@ class QuTAGController:
             self.qutag.deInitialize()
             self.initialised = False
 
+    def set_update_interval(self, interval):
+        self.update_interval = interval
+
     def is_initialised(self):
         return self.initialised
 
+    def get_enabled_channels(self):
+        start_enabled, enabled_channels = self.qutag.getChannelsEnabled()
+        while len(enabled_channels) < 8:
+            enabled_channels = '0' + enabled_channels
+        return start_enabled, enabled_channels
+
     def get_enabled(self, channel):
-        start_enabled, channels_enabled = self.qutag.getChannelsEnabled()
-        while len(channels_enabled) < 8:
-            channels_enabled = '0' + channels_enabled
+        start_enabled, enabled_channels = self.get_enabled_channels()
         if channel:
-            return channels_enabled[8 - channel] == '1'
+            return enabled_channels[8 - channel] == '1'
         return start_enabled
 
     def enable_channel(self, channel, enable):
-        start_enabled, channels_enabled = self.qutag.getChannelsEnabled()
-        while len(channels_enabled) < 8:
-            channels_enabled = '0' + channels_enabled
+        start_enabled, enabled_channels = self.get_enabled_channels()
 
         if channel:
-#            channels_enabled[channel-1] = '1' if enable else '0'
-# In Python some features are just broken by design  :-/
-            if enable:
-                channels_enabled[:channel-1] + '1' + channels_enabled[:channel]
-            else:
-                channels_enabled[:channel-1] + '0' + channels_enabled[:channel]
+            enabled_channels = \
+              replace_char(enabled_channels, 8 - channel, '1' if enable else '0')
         else:
             start_enabled = enable
-        self.qutag.enableChannels(start_enabled, channels_enabled)
+        self.qutag.enableChannels(start_enabled, enabled_channels)
 
     def get_trigger_edge(self, channel):
         edge, threshold = self.qutag.getSignalConditioning(channel)
@@ -92,73 +94,43 @@ class QuTAGController:
         edge, threshold = self.qutag.getSignalConditioning(channel)
         self.qutag.setSignalConditioning(channel, cond, edge, threshold)
 
-    def start_grabbing(self):
-        self.thread = Thread(target=self.loop)
+    def start_grabbing(self, callback):
+        for i,get_count_rate in enumerate(self.get_count_rate):
+            if get_count_rate:
+                self.enable_channel(i+1, True)
+
         self._stop = False
-        for i,active in enumerate(self.channel_active):
-            if active:
-                self.enable_channel(i, True)
+        self.sample_count.fill(0)
+        self.count_rate_channels = \
+            [channel for channel,get_count_rate in enumerate(self.get_count_rate)
+             if get_count_rate]
+
+        self.callback = callback
+        self.thread = Thread(target=self.loop)
         self.qutag.getLastTimestamps(reset=True)
-        self.starting_time = np.full(8, time.time())
-        self.rates = np.zeros(8)
-        self.sample_count = np.zeros(8, dtype=np.int32)
-        self.update_start = [True for _ in range(9)]
         self.thread.start()
+        return ['channel %d' % (c + 1) for c in self.count_rate_channels]
 
     def loop(self):
+        previous_update = time.time()
         while not self._stop:
             result = self.qutag.getLastTimestamps(reset=True)
+            if not range(result[2]):
+                continue
             now = time.time()
             for i in range(result[2]): # loop over all events
-                channel = result[1][i]
-                if self.channel_active[channel]:
-                    self.sample_count[channel] += 1
-            for channel,active in enumerate(self.channel_active):
-                if not active:
-                    continue
-                if self.update_start[channel]: # rate has recently been grabbed
-                    self.update_start[channel] = False
-                    self.starting_time[channel] = now
-                else:
-                    self.rates[channel] = \
-                        self.sample_count[channel] \
-                        / (now - self.starting_time[channel])
+                self.sample_count[result[1][i]] += 1
 
-    def get_rate(self, channel):
-        result = self.rates[channel]
-        if not self.update_start[channel]: # handshaking with thread loop
-            self.update_start[channel] = True
-        return result
-
-    def get_rates(self):
-        rates = []
-        for i,active in enumerate(self.channel_active):
-            if not active:
+            dt = now - previous_update
+            if dt < self.update_interval:
                 continue
-            rates.append(np.array([self.rates[i]]))
-            if not self.update_start[i]: # handshaking with thread loop
-                self.update_start[i] = True
-        return rates
 
-    def start_histogram(self, channel, callback):
-        self.send_histogram[channel] = True
-        self.start(channel, callback)
+            data = [np.array([self.sample_count[channel] / dt])
+                    for channel in self.count_rate_channels]
 
-    def make_histogram(self, channel):
-        n_bins = self.n_bins[channel]
-        from_range = min(self.samples[channel][:self.n_samples[channel]])
-        to_range = max(self.samples[channel][:self.n_samples[channel]])
-        bin_width = (to_range - from_range) / n_bins
-        centers = np.linspace(from_range + bin_width / 2,
-                              to_range - bin_width / 2, n_bins)
-        bins = np.zeros(n_bins)
-        for val in self.samples[channel][:self.max_samples[channel]]:
-            idx = int((val - from_range) / bin_width)
-            if idx >= 0 and idx < n_bins:
-                bins[idx] += 1
-        centers = np.linspace(from_range + bin_width / 2,
-                              to_range - bin_width / 2, n_bins)
-        return centers, bins
+            previous_update = now
+            self.sample_count.fill(0)
+            self.callback(data)
 
     def stop(self):
         if self.thread is not None:
