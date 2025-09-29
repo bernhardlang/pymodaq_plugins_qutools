@@ -20,19 +20,19 @@ class DAQ_1DViewer_Qutag(DAQ_Viewer_base):
         { 'title': 'Trigger Threshold', 'name': 'trigger_threshold',
           'type': 'float', 'min': -2, 'max': 3 },
     ]
-    
+
     channel_settings = conditioning + [
         { 'title': 'Enabled?', 'name': 'enabled', 'type': 'bool',
           'value': True },
         { 'title': 'Get Count Rate?', 'name': 'get_count_rate', 'type': 'bool',
           'value': False },
     ]
-    
+
     start_settings = conditioning + [
         { 'title': 'Enabled?', 'name': 'enabled', 'type': 'bool',
           'value': True },
     ]
-    
+
     params = comon_parameters+[
         { 'title': 'Update Interval [s]', 'name': 'update_interval',
           'type': 'float', 'value': 1 },
@@ -70,7 +70,7 @@ class DAQ_1DViewer_Qutag(DAQ_Viewer_base):
         self.n_bins = 20
         self.calculate_difference = True # params not taken into account
 
-    def get_channel(self, parent_name):
+    def get_channel_from_param_name(self, parent_name):
         if parent_name == "settings_start":
             return 0
         try:
@@ -80,7 +80,7 @@ class DAQ_1DViewer_Qutag(DAQ_Viewer_base):
         except:
             return -1
         return channel
-     
+
     def commit_settings(self, param: Parameter):
         """Apply the consequences of a change of value in the detector settings
 
@@ -100,7 +100,7 @@ class DAQ_1DViewer_Qutag(DAQ_Viewer_base):
             self.calculate_difference = param.value()
             return
 
-        channel = self.get_channel(param.parent().name())
+        channel = self.get_channel_from_param_name(param.parent().name())
         if channel < 0:
             return
 
@@ -140,6 +140,7 @@ class DAQ_1DViewer_Qutag(DAQ_Viewer_base):
             self.controller = controller
             initialized = True
 
+        self.controller.qutag.enableChannels(True)
         for channel in range(9):
             if channel:
                 settings_name = 'settings_ch%d' % channel
@@ -206,6 +207,8 @@ class DAQ_1DViewer_Qutag(DAQ_Viewer_base):
             time_tags.append(diff)
 
         for channel,tags in enumerate(time_tags):
+            if not len(tags):
+                continue
             min_val = min(tags)
             max_val = max(tags)
             bin_size = (max_val - min_val) / self.n_bins
@@ -220,13 +223,13 @@ class DAQ_1DViewer_Qutag(DAQ_Viewer_base):
                 label = self.active_channel_list[channel]
             except:
                 label = 'difference'
-                
+
             dfp = DataFromPlugins(name='qutag', data=bins, dim='Data1D',
                                   labels=[label],
                                   axes=[Axis(data=centers, label='', units='',
                                              index=0)])
             data.append(dfp)
-                
+
         self.dte_signal.emit(DataToExport(name='qutag', data=data))
 
     def stop(self):
@@ -237,6 +240,6 @@ class DAQ_1DViewer_Qutag(DAQ_Viewer_base):
 
 
 if __name__ == '__main__':
-    from PyQt5.QtCore import pyqtRemoveInputHook
-    pyqtRemoveInputHook()
+    from PyQt6.QtCore import pyqtRemoveInputHook
+    pyqtRemoveInputHook() # to be able to use pdb inside Qt's event loops
     main(__file__)

@@ -119,6 +119,8 @@ class QuTAGController:
     def loop(self):
         previous_update = time.time()
         while not self._stop:
+            if not self.initialised:
+                return
             result = self.qutag.getLastTimestamps(reset=True)
             if not range(result[2]):
                 continue
@@ -143,16 +145,19 @@ class QuTAGController:
         time_tags = [[] for _ in range(len(self.count_rate_channels))]
         prev_channel = -1
         while not self._stop:
+            if not self.initialised:
+                return
             result = self.qutag.getLastTimestamps(reset=True)
-            if not range(result[2]):
-                continue
             now = time.time()
             for i in range(result[2]): # loop over all events
                 channel = result[1][i]
                 if prev_channel == channel:
                     continue
                 prev_channel = channel
-                time_tags[channel].append(result[0][i] * 1e-6)
+                try:
+                    time_tags[channel].append(result[0][i] * 1e-6)
+                except:
+                    pass
 
             if now < next_update:
                 continue
@@ -169,9 +174,9 @@ class QuTAGController:
         start = False
         prev_channel = -1
         while not self._stop:
+            if not self.initialised:
+                return
             result = self.qutag.getLastTimestamps(reset=True)
-            if not range(result[2]):
-                continue
             now = time.time()
             for i in range(result[2]): # loop over all events
                 channel = result[1][i]
@@ -182,7 +187,10 @@ class QuTAGController:
                 prev_channel = channel
                 if not start:
                     continue
-                time_tags[channel].append(result[0][i] * 1e-6)
+                try:
+                    time_tags[channel].append(result[0][i] * 1e-6)
+                except:
+                    pass
 
             if now < next_update:
                 continue
@@ -198,4 +206,3 @@ class QuTAGController:
             self._stop = True
             self.thread.join()
             self.thread = None
-        self.close_communication() # workaround for PyMoDAQ not calling that
