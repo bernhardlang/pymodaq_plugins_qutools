@@ -24,66 +24,43 @@ class QuTAGApp(gutils.CustomApp):
 
         self.setup_ui()
 
+    def make_dock(self, name, title, next_to=None, which=None):
+        self.docks[name] = Dock(title)
+        if next_to is None:
+            self.dockarea.addDock(self.docks[name])
+        else:
+            self.dockarea.addDock(self.docks[name], next_to, which)
+        widget = QWidget()
+        viewer = Viewer1D(widget)
+        self.docks[name].addWidget(widget)
+        return viewer
+        
     def setup_docks(self):
-        self.docks['ch1'] = Dock('Channel 1')
-        self.dockarea.addDock(self.docks['ch1'])
-        self.ch1_widget = QWidget()
-        self.ch1_viewer = Viewer1D(self.ch1_widget)
-        self.docks['ch1'].addWidget(self.ch1_widget)
+        self.ch1_viewer = self.make_dock('ch1', 'Channel 1')
+        self.ch1_mean_viewer = \
+            self.make_dock('ch1_mean', 'Mean 1', "right", self.docks['ch1'])
+        self.ch1_sigma_viewer = \
+            self.make_dock('ch1_sigma', 'Sigma 1', "right",
+                           self.docks['ch1_mean'])
 
-        self.docks['ch1_mean'] = Dock('Channel 1 Mean')
-        self.dockarea.addDock(self.docks['ch1_mean'], "right", self.docks['ch1'])
-        self.ch1_mean_widget = QWidget()
-        self.ch1_mean_viewer = Viewer1D(self.ch1_mean_widget)
-        self.docks['ch1_mean'].addWidget(self.ch1_mean_widget)
+        self.ch2_viewer = \
+            self.make_dock('ch2', 'Channel 2', "bottom", self.docks['ch1'])
+        self.ch2_mean_viewer = \
+            self.make_dock('ch2_mean', 'Mean 2', "bottom",
+                           self.docks['ch1_mean'])
+        self.ch2_sigma_viewer = \
+            self.make_dock('ch2_sigma', 'Sigma 2', "bottom",
+                           self.docks['ch1_sigma'])
 
-        self.docks['ch1_sigma'] = Dock('Channel 1 Sigma')
-        self.dockarea.addDock(self.docks['ch1_sigma'], "right",
-                              self.docks['ch1'])
-        self.ch1_sigma_widget = QWidget()
-        self.ch1_sigma_viewer = Viewer1D(self.ch1_sigma_widget)
-        self.docks['ch1_sigma'].addWidget(self.ch1_sigma_widget)
+        self.ch3_viewer = \
+            self.make_dock('ch3', 'Channel 3', "bottom", self.docks['ch2'])
+        self.ch3_mean_viewer = \
+            self.make_dock('ch3_mean', 'Mean 3', "bottom",
+                           self.docks['ch2_mean'])
+        self.ch3_sigma_viewer = \
+            self.make_dock('ch3_sigma', 'Sigma 3', "bottom",
+                           self.docks['ch2_sigma'])
 
-        self.docks['ch2'] = Dock('Channel 2')
-        self.dockarea.addDock(self.docks['ch2'], "bottom", self.docks['ch1'])
-        self.ch2_widget = QWidget()
-        self.ch2_viewer = Viewer1D(self.ch2_widget)
-        self.docks['ch2'].addWidget(self.ch2_widget)
-
-        self.docks['ch2_mean'] = Dock('Channel 2 Mean')
-        self.dockarea.addDock(self.docks['ch2_mean'], "bottom",
-                              self.docks['ch1_mean'])
-        self.ch2_mean_widget = QWidget()
-        self.ch2_mean_viewer = Viewer1D(self.ch2_mean_widget)
-        self.docks['ch2_mean'].addWidget(self.ch2_mean_widget)
-
-        self.docks['ch2_sigma'] = Dock('Channel 2 Sigma')
-        self.dockarea.addDock(self.docks['ch2_sigma'], "bottom",
-                              self.docks['ch1_sigma'])
-        self.ch2_sigma_widget = QWidget()
-        self.ch2_sigma_viewer = Viewer1D(self.ch2_sigma_widget)
-        self.docks['ch2_sigma'].addWidget(self.ch2_sigma_widget)
-        
-        self.docks['ch3'] = Dock('Channel 3')
-        self.dockarea.addDock(self.docks['ch3'], "bottom", self.docks['ch2'])
-        self.ch3_widget = QWidget()
-        self.ch3_viewer = Viewer1D(self.ch3_widget)
-        self.docks['ch3'].addWidget(self.ch3_widget)
-
-        self.docks['ch3_mean'] = Dock('Channel 3 Mean')
-        self.dockarea.addDock(self.docks['ch3_mean'], "bottom",
-                              self.docks['ch2_mean'])
-        self.ch3_mean_widget = QWidget()
-        self.ch3_mean_viewer = Viewer1D(self.ch3_mean_widget)
-        self.docks['ch3_mean'].addWidget(self.ch3_mean_widget)
-
-        self.docks['ch3_sigma'] = Dock('Channel 3 Sigma')
-        self.dockarea.addDock(self.docks['ch3_sigma'], "bottom",
-                              self.docks['ch2_sigma'])
-        self.ch3_sigma_widget = QWidget()
-        self.ch3_sigma_viewer = Viewer1D(self.ch3_sigma_widget)
-        self.docks['ch3_sigma'].addWidget(self.ch3_sigma_widget)
-        
     def setup_actions(self):
         pass
 
