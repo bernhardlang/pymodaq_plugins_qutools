@@ -1,11 +1,11 @@
-from qtpy import QtWidgets
-
+from qtpy.QtGui import QKeySequence
 from qtpy.QtWidgets import QMainWindow, QWidget, QApplication, QProgressBar, \
-    QFileDialog # <<--
+    QFileDialog, QMenuBar # <<--
 from pymodaq_gui import utils as gutils
 from pymodaq_utils.config import Config
 from pymodaq_utils.logger import set_logger, get_module_name
 from pymodaq_gui.utils.dock import DockArea, Dock
+from pymodaq_gui.utils.main_window import MainWindow
 from pymodaq_gui.plotting.data_viewers.viewer1D import Viewer1D
 from pymodaq_plugins_qutools.utils import Config as PluginConfig
 
@@ -21,8 +21,8 @@ class QuTAGApp(gutils.CustomApp):
 
     def __init__(self, parent: gutils.DockArea):
         super().__init__(parent)
-
         self.setup_ui()
+        self.acquiring = False
 
     def make_dock(self, name, title, next_to=None, which=None):
         self.docks[name] = Dock(title)
@@ -31,7 +31,7 @@ class QuTAGApp(gutils.CustomApp):
         else:
             self.dockarea.addDock(self.docks[name], next_to, which)
         widget = QWidget()
-        viewer = Viewer1D(widget)
+        viewer = Viewer1D(widget, show_toolbar=False)
         self.docks[name].addWidget(widget)
         return viewer
         
@@ -42,6 +42,9 @@ class QuTAGApp(gutils.CustomApp):
         self.ch1_sigma_viewer = \
             self.make_dock('ch1_sigma', 'Sigma 1', "right",
                            self.docks['ch1_mean'])
+        self.ch1_rate_viewer = \
+            self.make_dock('ch1_rate', 'Rate 1', "right",
+                           self.docks['ch1_sigma'])
 
         self.ch2_viewer = \
             self.make_dock('ch2', 'Channel 2', "bottom", self.docks['ch1'])
@@ -51,65 +54,46 @@ class QuTAGApp(gutils.CustomApp):
         self.ch2_sigma_viewer = \
             self.make_dock('ch2_sigma', 'Sigma 2', "bottom",
                            self.docks['ch1_sigma'])
-
-        self.ch3_viewer = \
-            self.make_dock('ch3', 'Channel 3', "bottom", self.docks['ch2'])
-        self.ch3_mean_viewer = \
-            self.make_dock('ch3_mean', 'Mean 3', "bottom",
-                           self.docks['ch2_mean'])
-        self.ch3_sigma_viewer = \
-            self.make_dock('ch3_sigma', 'Sigma 3', "bottom",
-                           self.docks['ch2_sigma'])
+        self.ch2_rate_viewer = \
+            self.make_dock('ch2_rate', 'Rate 2', "bottom",
+                           self.docks['ch1_rate'])
 
     def setup_actions(self):
-        pass
+        self.add_action('acquire', 'Acquire', 'spectrumAnalyzer',
+                        "Acquire", checkable=False, toolbar=self.toolbar)
 
     def connect_things(self):
-        pass
+        self.quit_action.triggered.connect(self.mainwindow.close)
+        self.connect_action('acquire', self.start_acquiring)
+        self.detector.grab_done_signal.connect(self.show_data)
 
-    def setup_menu(self, menubar: QtWidgets.QMenuBar = None):
-        """Non mandatory method to be subclassed in order to create a menubar
-
-        create menu for actions contained into the self._actions, for instance:
-
-        Examples
-        --------
-        >>>file_menu = menubar.addMenu('File')
-        >>>self.affect_to('load', file_menu)
-        >>>self.affect_to('save', file_menu)
-
-        >>>file_menu.addSeparator()
-        >>>self.affect_to('quit', file_menu)
-
-        See Also
-        --------
-        pymodaq.utils.managers.action_manager.ActionManager
-        """
-        # todo create and populate menu using actions defined above in self.setup_actions
-        pass
+    def setup_menu(self, menubar: QMenuBar = None):
+        file_menu = self.mainwindow.menuBar().addMenu('File')
+#        self.affect_to('save', file_menu)
+#        file_menu.addSeparator()
+        self.quit_action = file_menu.addAction("Quit", QKeySequence('Ctrl+Q'))
 
     def value_changed(self, param):
-        """ Actions to perform when one of the param's value in self.settings is changed from the
-        user interface
-
-        For instance:
-        if param.name() == 'do_something':
-            if param.value():
-                print('Do something')
-                self.settings.child('main_settings', 'something_done').setValue(False)
-
-        Parameters
-        ----------
-        param: (Parameter) the parameter whose value just changed
-        """
         pass
+
+    def stop_acquiring(self):
+        pass
+
+    def start_acquiring(self):
+        """Start acquisition"""
+
+        if self.acquiring: # rather stop it
+            self.stop_acquiring()
+            return
+
+        self.acquiring = True
 
 
 def main():
     from pymodaq_gui.utils.utils import mkQApp
     app = mkQApp('CustomApp')
 
-    mainwindow = QtWidgets.QMainWindow()
+    mainwindow = MainWindow()
     dockarea = gutils.DockArea()
     mainwindow.setCentralWidget(dockarea)
 
