@@ -65,10 +65,12 @@ class DAQ_1DViewer_Qutag(DAQ_Viewer_base):
               ]
           }]
 
+    live_mode_available = True
+
     def ini_attributes(self):
         self.controller: QuTAGController = None
         self.n_bins = 20
-        self.calculate_difference = True # params not taken into account
+        self.live = False
 
     def get_channel_from_param_name(self, parent_name):
         if parent_name == "settings_start":
@@ -175,6 +177,18 @@ class DAQ_1DViewer_Qutag(DAQ_Viewer_base):
         self.settings.child("line_settings").child(channel_key)\
             .child('get_count_rate').setValue(enable)
 
+    def determine_active_channels(self):
+        channels = []
+        for channel in range(1,9):
+            if not self.controller.get_enabled(channel):
+                continue
+            if self.settings.child("grab_enabled").value() \
+               or self.settings.child("line_settings") \
+                               .child("settings_ch%d" % channel) \
+                               .child("get_count_rate").value():
+                channels.append(channel)
+        return channels
+        
     def grab_data(self, Naverage=1, **kwargs):
         """Start a grab from the detector
 
@@ -187,15 +201,26 @@ class DAQ_1DViewer_Qutag(DAQ_Viewer_base):
         kwargs: dict
             others optionals arguments
         """
-        if self.controller.thread is None:
-            if self.settings.child("grab_enabled").value():
-                for channel in range(1,9):
-                    if self.controller.get_enabled(channel):
-                        self.activate_grabbing(channel, True)
-                        self.controller.get_count_rate[channel-1] = 1
-            self.active_channel_list = \
-                self.controller.start_grabbing_hist(self.callback)
-        return
+        if 'live' in kwargs:
+            if kwargs['live']:
+                self.live = True
+                channels = self.determine_active_channels()
+                update_interval = self.settings.child("update_interval").value()
+                self.channel_list = \
+                    self.controller.start_events(channels, self.callback,
+                                                 update_interval)
+            elif self.live:
+                self.live = False
+                self.controller.stop_events()
+            return
+
+        if not self.controller.collecting_events:
+            channels = self.determine_active_channels()
+            self.channel_list = self.controller.start_events(channels)
+            return
+
+        time_tags = self.controller.grab_time_tags()
+        self.callback(time_tags)
 
     def callback(self, time_tags):
         data = []
@@ -234,8 +259,8 @@ class DAQ_1DViewer_Qutag(DAQ_Viewer_base):
 
     def stop(self):
         """Stop the current grab hardware wise if necessary"""
-        self.controller.stop()
-        self.emit_status(ThreadCommand('Update_Status', ['quTAG halted']))
+        self.controller.stop_grab_events()
+        self.emit_status(ThreadCommand('Update_Status', ['quTAG hist halted']))
         return ''
 
 

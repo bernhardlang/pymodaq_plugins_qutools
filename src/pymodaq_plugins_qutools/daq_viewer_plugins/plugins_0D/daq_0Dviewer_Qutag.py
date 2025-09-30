@@ -61,6 +61,8 @@ class DAQ_0DViewer_Qutag(DAQ_Viewer_base):
               ]
           }]
 
+    live_mode_available = True
+
     def ini_attributes(self):
         self.controller: QuTAGController = None
 
