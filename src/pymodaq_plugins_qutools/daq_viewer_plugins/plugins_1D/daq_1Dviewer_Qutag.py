@@ -224,7 +224,7 @@ class DAQ_1DViewer_Qutag(DAQ_Viewer_base):
 
     def callback(self, time_tags):
         data = []
-        if self.calculate_difference:
+        if self.settings.child('calculate_difference').value():
             n_tags = min(len(time_tags[0]), len(time_tags[1]))
             diff = np.empty(n_tags)
             for i in range(n_tags):
@@ -259,7 +259,7 @@ class DAQ_1DViewer_Qutag(DAQ_Viewer_base):
 
     def stop(self):
         """Stop the current grab hardware wise if necessary"""
-        self.controller.stop_grab_events()
+        self.controller.stop_events()
         self.emit_status(ThreadCommand('Update_Status', ['quTAG hist halted']))
         return ''
 
@@ -267,4 +267,4 @@ class DAQ_1DViewer_Qutag(DAQ_Viewer_base):
 if __name__ == '__main__':
     from PyQt6.QtCore import pyqtRemoveInputHook
     pyqtRemoveInputHook() # to be able to use pdb inside Qt's event loops
-    main(__file__)
+    main(__file__, init_h5=False)

@@ -18,8 +18,10 @@ class QuTAGController:
     def __init__(self):
         self.initialised = False
         self.thread = None
-        self.rate_callback = None
+        self.rates_callback = None
+        self.initialise_rates = False
         self.event_callback = None
+        self.initialise_events = False
         self.sample_count = np.zeros(8, dtype=np.int32)
         self.alternate_only = True 
 
@@ -100,14 +102,15 @@ class QuTAGController:
         self.events_callback = callback
         self.events_update_interval = update_interval
         self.event_channels, channel_names = self.get_channel_list(channels)
+        self.initialise_events = True
         self.start_tagging()
-        self.start_events = True
         return channel_names
 
     def start_rate(self, channels, callback=None, update_interval=None):
         self.rates_callback = callback
         self.rates_update_interval = update_interval
         self.rate_channels, channel_names = self.get_channel_list(channels)
+        self.initialise_rates = True
         self.start_tagging()
         self.start_rates = True
         return channel_names
@@ -128,9 +131,39 @@ class QuTAGController:
         self.thread = Thread(target=self.loop)
         self.qutag.getLastTimestamps(reset=True)
         self.thread.start()
-        return ['channel %d' % (c + 1) for c in self.active_channels]
 
+    def grab_time_tags(self):
+        time_tags = [np.array(t) for t in self.time_tags]
+        self.time_tags = [[] for _ in range(len(self.event_channels))]
+        return time_tags
+
+    def grab_rates(self, now):
+        dt = now - self.rates_start
+        self.rates_start = now
+        data = [np.array([self.sample_count[channel] / dt])
+                for channel in self.rate_channels]
+        self.sample_count.fill(0)
+        return data
+        
+    def stop_events(self):
+        self.event_callback = None
+        if self.rates_callback is None:
+            self.stop_tagging()
+
+    def stop_rate(self):
+        self.rates_callback = None
+        if self.event_callback is None:
+            self.stop_tagging()
+
+    def stop_tagging(self):
+        if self.thread is not None:
+            self._stop = True
+            self.thread.join()
+            self.thread = None
+
+# thread matter
     def loop(self):
+        prev_channel = -1
         while not self._stop:
             if not self.initialised:
                 return
@@ -138,17 +171,13 @@ class QuTAGController:
             result = self.qutag.getLastTimestamps(reset=True)
             now = time.time()
 
-            if self.start_events:
-                self.start_events = False
-                self.time_tags = [[] for _ in range(len(self.event_channels))]
-                next_events_update = events_start + self.events_update_interval
+            if self.initialise_events:
+                self.clear_events(now)
+                self.initialise_events = False
 
-            if self.start_rates:
-                self.start_rates = False
-                rates_start = now
-                self.sample_count = np.zeros(len(channels))
-                self.time_tags = [[] for _ in range(len(self.event_channels))]
-                next_rates_update = rates_start + self.rates_update_interval
+            if self.initialise_rates:
+                self.clear_rates(now)
+                self.initialise_rates = False
 
             for i in range(result[2]): # loop over all events
                 channel = result[1][i]
@@ -164,38 +193,24 @@ class QuTAGController:
                 except:
                     pass
 
-            if self.rates_callback is not None and now > next_rates_update:
-                dt = now - rates_start_time
-                rates_start_time = now
-                next_rates_update = now + self.rates_update_interval
-                data = [np.array([self.sample_count[channel] / dt])
-                        for channel in self.rate_channels]
-                self.sample_count.fill(0)
-                if len(data):
-                    self.rates_callback(data)
+            if not self.initialise_rates and self.rates_callback is not None \
+               and now > self.next_rates_update:
+                rates = self.grab_rates(now)
+                if len(rates):
+                    self.rates_callback(rates)
+                self.clear_rates(now)
 
-            if self.events_callback is not None and now > next_events_update:
+            if not self.initialise_events and self.events_callback is not None \
+               and now > self.next_events_update:
                 time_tags = self.grab_time_tags()
-                next_events_update = now + self.events_update_interval
                 self.events_callback(time_tags)
+                self.clear_events(now)
 
-    def grab_time_tags(self):
-        time_tags = [np.array(t) for t in self.time_tags]
+    def clear_events(self, now):
         self.time_tags = [[] for _ in range(len(self.event_channels))]
-        return time_tags
-        
-    def stop_events(self):
-        self.event_callback = None
-        if self.rate_callback is None:
-            self.stop_tagging()
+        self.next_events_update = now + self.events_update_interval
 
-    def stop_rate(self):
-        self.rate_callback = None
-        if self.event_callback is None:
-            self.stop_tagging()
-
-    def stop_tagging(self):
-        if self.thread is not None:
-            self._stop = True
-            self.thread.join()
-            self.thread = None
+    def clear_rates(self, now):
+        self.sample_count = np.zeros(len(channels))
+        self.next_rates_update = now + self.rates_update_interval
+        self.rates_start = now

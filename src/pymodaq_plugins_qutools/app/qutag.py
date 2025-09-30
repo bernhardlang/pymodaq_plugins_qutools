@@ -1,9 +1,11 @@
 from qtpy.QtGui import QKeySequence
 from qtpy.QtWidgets import QMainWindow, QWidget, QApplication, QProgressBar, \
     QFileDialog, QMenuBar # <<--
-from pymodaq_gui import utils as gutils
+from pymodaq.control_modules.daq_viewer import DAQ_Viewer
 from pymodaq_utils.config import Config
 from pymodaq_utils.logger import set_logger, get_module_name
+from pymodaq.utils.data import DataToExport, DataFromPlugins
+from pymodaq_gui import utils as gutils
 from pymodaq_gui.utils.dock import DockArea, Dock
 from pymodaq_gui.utils.main_window import MainWindow
 from pymodaq_gui.plotting.data_viewers.viewer1D import Viewer1D
@@ -21,6 +23,7 @@ class QuTAGApp(gutils.CustomApp):
 
     def __init__(self, parent: gutils.DockArea):
         super().__init__(parent)
+        self.plugin = 'Qutag'
         self.setup_ui()
         self.acquiring = False
 
@@ -58,6 +61,29 @@ class QuTAGApp(gutils.CustomApp):
             self.make_dock('ch2_rate', 'Rate 2', "bottom",
                            self.docks['ch1_rate'])
 
+        self.diff_viewer = \
+            self.make_dock('diff', 'Difference', "bottom", self.docks['ch2'])
+        self.diff_mean_viewer = \
+            self.make_dock('diff_mean', 'Mean Diff.', "bottom",
+                           self.docks['ch2_mean'])
+        self.diff_sigma_viewer = \
+            self.make_dock('diff_sigma', 'Sigma Diff.', "bottom",
+                           self.docks['ch2_sigma'])
+        self.docks['empty'] = Dock(name='')
+        self.dockarea.addDock(self.docks['empty'], 'bottom',
+                              self.docks['ch2_rate'])
+
+        # separate window with raw detector data
+        self.daq_viewer_area = DockArea()
+        self.detector = \
+            DAQ_Viewer(self.daq_viewer_area, title=self.plugin, init_h5=False)
+        self.detector.daq_type = 'DAQ1D'
+        self.detector.detector = self.plugin
+        self.detector.init_hardware()
+
+        self.mainwindow.set_shutdown_callback(self.detector.quit_fun)
+        self.detector.grab_status.connect(self.mainwindow.disable_close)
+        
     def setup_actions(self):
         self.add_action('acquire', 'Acquire', 'spectrumAnalyzer',
                         "Acquire", checkable=False, toolbar=self.toolbar)
@@ -77,7 +103,7 @@ class QuTAGApp(gutils.CustomApp):
         pass
 
     def stop_acquiring(self):
-        pass
+        self.detector.stop()
 
     def start_acquiring(self):
         """Start acquisition"""
@@ -87,11 +113,22 @@ class QuTAGApp(gutils.CustomApp):
             return
 
         self.acquiring = True
+        self.detector.grab()
 
+    def show_data(self, data: DataToExport):
+        data1D = data.get_data_from_dim('Data1D')
+        ch1 = data1D[0]
+        self.ch1_viewer.show_data(ch1)
+        ch2 = data1D[1]
+        self.ch2_viewer.show_data(ch2)
+        diff = data1D[2]
+        self.diff_viewer.show_data(diff)
 
 def main():
     from pymodaq_gui.utils.utils import mkQApp
+    from qtpy.QtCore import pyqtRemoveInputHook
     app = mkQApp('CustomApp')
+    pyqtRemoveInputHook() # needed for using pdb inside the qt eventloop
 
     mainwindow = MainWindow()
     dockarea = gutils.DockArea()
