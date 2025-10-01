@@ -635,8 +635,6 @@ class QuTAG:
             i += 1	
             if i > self.TDC_QUTAG_CHANNELS:
                 print("Error in computing channelMask (getChannelsEnabled).")
-                import pdb
-                pdb.set_trace()
                 break
         if ans != 0:
             print("Error in TDC_enableChannels: "+self.err_dict[ans])

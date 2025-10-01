@@ -1,14 +1,15 @@
+import numpy as np
 from qtpy.QtGui import QKeySequence
 from qtpy.QtWidgets import QMainWindow, QWidget, QApplication, QProgressBar, \
     QFileDialog, QMenuBar # <<--
 from pymodaq.control_modules.daq_viewer import DAQ_Viewer
 from pymodaq_utils.config import Config
 from pymodaq_utils.logger import set_logger, get_module_name
-from pymodaq.utils.data import DataToExport, DataFromPlugins
+from pymodaq.utils.data import DataToExport, DataFromPlugins, DataWithAxes
 from pymodaq_gui import utils as gutils
 from pymodaq_gui.utils.dock import DockArea, Dock
 from pymodaq_gui.utils.main_window import MainWindow
-from pymodaq_gui.plotting.data_viewers.viewer1D import Viewer1D
+from pymodaq_gui.plotting.data_viewers.viewer1D import Viewer1D, Viewer0D
 from pymodaq_plugins_qutools.utils import Config as PluginConfig
 
 logger = set_logger(get_module_name(__file__))
@@ -27,47 +28,50 @@ class QuTAGApp(gutils.CustomApp):
         self.setup_ui()
         self.acquiring = False
 
-    def make_dock(self, name, title, next_to=None, which=None):
+    def make_dock(self, name, title, viewer_type, next_to=None, which=None):
         self.docks[name] = Dock(title)
         if next_to is None:
             self.dockarea.addDock(self.docks[name])
         else:
             self.dockarea.addDock(self.docks[name], next_to, which)
         widget = QWidget()
-        viewer = Viewer1D(widget, show_toolbar=False)
+        viewer = viewer_type(widget, show_toolbar=False)
         self.docks[name].addWidget(widget)
         return viewer
-        
+
     def setup_docks(self):
-        self.ch1_viewer = self.make_dock('ch1', 'Channel 1')
+        self.ch1_viewer = self.make_dock('ch1', 'Channel 1', Viewer1D)
         self.ch1_mean_viewer = \
-            self.make_dock('ch1_mean', 'Mean 1', "right", self.docks['ch1'])
+            self.make_dock('ch1_mean', 'Mean 1', Viewer0D, "right",
+                           self.docks['ch1'])
         self.ch1_sigma_viewer = \
-            self.make_dock('ch1_sigma', 'Sigma 1', "right",
+            self.make_dock('ch1_sigma', 'Sigma 1', Viewer0D, "right",
                            self.docks['ch1_mean'])
         self.ch1_rate_viewer = \
-            self.make_dock('ch1_rate', 'Rate 1', "right",
+            self.make_dock('ch1_rate', 'Rate 1', Viewer0D, "right",
                            self.docks['ch1_sigma'])
 
         self.ch2_viewer = \
-            self.make_dock('ch2', 'Channel 2', "bottom", self.docks['ch1'])
+            self.make_dock('ch2', 'Channel 2', Viewer1D, "bottom",
+                           self.docks['ch1'])
         self.ch2_mean_viewer = \
-            self.make_dock('ch2_mean', 'Mean 2', "bottom",
+            self.make_dock('ch2_mean', 'Mean 2', Viewer0D, "bottom",
                            self.docks['ch1_mean'])
         self.ch2_sigma_viewer = \
-            self.make_dock('ch2_sigma', 'Sigma 2', "bottom",
+            self.make_dock('ch2_sigma', 'Sigma 2', Viewer0D, "bottom",
                            self.docks['ch1_sigma'])
         self.ch2_rate_viewer = \
-            self.make_dock('ch2_rate', 'Rate 2', "bottom",
+            self.make_dock('ch2_rate', 'Rate 2', Viewer0D, "bottom",
                            self.docks['ch1_rate'])
 
         self.diff_viewer = \
-            self.make_dock('diff', 'Difference', "bottom", self.docks['ch2'])
+            self.make_dock('diff', 'Difference', Viewer1D, "bottom",
+                           self.docks['ch2'])
         self.diff_mean_viewer = \
-            self.make_dock('diff_mean', 'Mean Diff.', "bottom",
+            self.make_dock('diff_mean', 'Mean Diff.', Viewer0D, "bottom",
                            self.docks['ch2_mean'])
         self.diff_sigma_viewer = \
-            self.make_dock('diff_sigma', 'Sigma Diff.', "bottom",
+            self.make_dock('diff_sigma', 'Sigma Diff.', Viewer0D, "bottom",
                            self.docks['ch2_sigma'])
         self.docks['empty'] = Dock(name='')
         self.dockarea.addDock(self.docks['empty'], 'bottom',
@@ -115,14 +119,47 @@ class QuTAGApp(gutils.CustomApp):
         self.acquiring = True
         self.detector.grab()
 
+    def get_mean_and_sigma(self, x, y):
+        total = sum(y)
+        mean = np.dot(x, y) / total
+        sigma = np.sqrt(np.dot((x - mean)**2, y) / total)
+        return mean, sigma
+
     def show_data(self, data: DataToExport):
         data1D = data.get_data_from_dim('Data1D')
-        ch1 = data1D[0]
-        self.ch1_viewer.show_data(ch1)
-        ch2 = data1D[1]
-        self.ch2_viewer.show_data(ch2)
-        diff = data1D[2]
-        self.diff_viewer.show_data(diff)
+        mean, sigma = \
+            self.get_mean_and_sigma(data1D[0].axes[0].get_data(),
+                                    data1D[0].data[0])
+        self.ch1_viewer.show_data(data1D[0])
+        self.ch1_mean_viewer.show_data(DataWithAxes(name="mean", dim='Data0D',
+                                                    source='calculated',
+                                                    data=[np.array([mean])]))
+        self.ch1_sigma_viewer.show_data(DataWithAxes(name="sigma", dim='Data0D',
+                                                     source='calculated',
+                                                     data=[np.array([sigma])]))
+
+        mean, sigma = \
+            self.get_mean_and_sigma(data1D[1].axes[0].get_data(),
+                                    data1D[1].data[0])
+        self.ch2_viewer.show_data(data1D[1])
+        self.ch2_mean_viewer.show_data(DataWithAxes(name="mean", dim='Data0D',
+                                                    source='calculated',
+                                                    data=[np.array([mean])]))
+        self.ch2_sigma_viewer.show_data(DataWithAxes(name="sigma", dim='Data0D',
+                                                     source='calculated',
+                                                     data=[np.array([sigma])]))
+
+        mean, sigma = \
+            self.get_mean_and_sigma(data1D[2].axes[0].get_data(),
+                                    data1D[2].data[0])
+        self.diff_viewer.show_data(data1D[2])
+        self.diff_mean_viewer.show_data(DataWithAxes(name="mean", dim='Data0D',
+                                                     source='calculated',
+                                                     data=[np.array([mean])]))
+        self.diff_sigma_viewer.show_data(DataWithAxes(name="sigma", dim='Data0D',
+                                                      source='calculated',
+                                                      data=[np.array([sigma])]))
+
 
 def main():
     from pymodaq_gui.utils.utils import mkQApp
