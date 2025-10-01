@@ -19,8 +19,10 @@ class QuTAGController:
         self.initialised = False
         self.thread = None
         self.rates_callback = None
+        self.rate_channels = None
         self.initialise_rates = False
-        self.event_callback = None
+        self.events_callback = None
+        self.event_channels = None
         self.initialise_events = False
         self.sample_count = np.zeros(8, dtype=np.int32)
         self.alternate_only = True 
@@ -45,11 +47,19 @@ class QuTAGController:
             self.qutag.deInitialize()
             self.initialised = False
 
-    def set_update_interval(self, interval):
-        self.update_interval = interval
-
     def is_initialised(self):
         return self.initialised
+
+    @property
+    def collecting_events(self):
+        return self.event_channels is not None
+
+    @property
+    def measuring_rates(self):
+        return self.rate_channels is not None
+
+    def set_update_interval(self, interval):
+        self.update_interval = interval
 
     def get_enabled_channels(self):
         start_enabled, enabled_channels = self.qutag.getChannelsEnabled()
@@ -101,28 +111,21 @@ class QuTAGController:
     def start_events(self, channels, callback=None, update_interval=None):
         self.events_callback = callback
         self.events_update_interval = update_interval
-        self.event_channels, channel_names = self.get_channel_list(channels)
-        self.initialise_events = True
-        self.start_tagging()
-        return channel_names
-
-    def start_rate(self, channels, callback=None, update_interval=None):
-        self.rates_callback = callback
-        self.rates_update_interval = update_interval
-        self.rate_channels, channel_names = self.get_channel_list(channels)
-        self.initialise_rates = True
-        self.start_tagging()
-        self.start_rates = True
-        return channel_names
-
-    def get_channel_list(self, channels):
-        channel_list = []
-        channel_names = []
+        self.event_channels = channels
         for channel in channels:
             self.enable_channel(channel+1, True)
-            channel_list.append(channel)
-            channel_names.append('channel %d' % (channel + 1))
-        return channel_list, channel_names
+        self.initialise_events = True
+        self.start_tagging()
+
+    def start_rates(self, channels, callback=None, update_interval=None):
+        self.rates_callback = callback
+        self.rates_update_interval = update_interval
+        self.rate_channels = channels
+        for channel in channels:
+            self.enable_channel(channel+1, True)
+        self.initialise_rates = True
+        self.start_rates = True
+        self.start_tagging()
 
     def start_tagging(self):
         if self.thread is not None:
@@ -140,19 +143,20 @@ class QuTAGController:
     def grab_rates(self, now):
         dt = now - self.rates_start
         self.rates_start = now
-        data = [np.array([self.sample_count[channel] / dt])
+        data = [np.array([self.sample_count[channel-1] / dt])
                 for channel in self.rate_channels]
         self.sample_count.fill(0)
         return data
         
     def stop_events(self):
-        self.event_callback = None
+        self.events_callback = None
         if self.rates_callback is None:
             self.stop_tagging()
+        self.event_channels = None
 
-    def stop_rate(self):
+    def stop_rates(self):
         self.rates_callback = None
-        if self.event_callback is None:
+        if self.events_callback is None:
             self.stop_tagging()
 
     def stop_tagging(self):
@@ -211,6 +215,6 @@ class QuTAGController:
         self.next_events_update = now + self.events_update_interval
 
     def clear_rates(self, now):
-        self.sample_count = np.zeros(len(channels))
+        self.sample_count = np.zeros(len(self.rate_channels))
         self.next_rates_update = now + self.rates_update_interval
         self.rates_start = now
