@@ -87,7 +87,7 @@ class QuTAGApp(gutils.CustomApp):
 
         self.mainwindow.set_shutdown_callback(self.detector.quit_fun)
         self.detector.grab_status.connect(self.mainwindow.disable_close)
-        
+
     def setup_actions(self):
         self.add_action('acquire', 'Acquire', 'spectrumAnalyzer',
                         "Acquire", checkable=False, toolbar=self.toolbar)
@@ -108,6 +108,7 @@ class QuTAGApp(gutils.CustomApp):
 
     def stop_acquiring(self):
         self.detector.stop()
+        self.acquiring = False
 
     def start_acquiring(self):
         """Start acquisition"""

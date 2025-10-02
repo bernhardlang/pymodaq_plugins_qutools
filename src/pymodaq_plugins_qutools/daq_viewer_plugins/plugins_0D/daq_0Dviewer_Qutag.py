@@ -72,4 +72,4 @@ class DAQ_0DViewer_Qutag(QutagCommon, DAQ_Viewer_base):
 if __name__ == '__main__':
     from PyQt5.QtCore import pyqtRemoveInputHook
     pyqtRemoveInputHook()
-    main(__file__, init_h5=False)
+    main(__file__)
