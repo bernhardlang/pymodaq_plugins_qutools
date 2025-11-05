@@ -64,7 +64,7 @@ class QuTAG:
             ('indexOffset',ctypes.c_int32),
             ('values',ctypes.c_double)]
             
-    def __init__(self):
+    def __init__(self, buf_size=None): # BL, def __init__(self):
         """Initializing the quTAG MC \n\n
         Checking the bit version of Python to load the corresponding DLL \n
         Loading 32 or 64 bit DLL: make sure the wrapper finds the matching DLL
@@ -103,7 +103,7 @@ class QuTAG:
         # Find and connect to quTAG device
         print("Initialize and Start with quTAG device: ", self.err_dict[self.Initialize()] )
         
-        self._bufferSize = 1000000
+        self._bufferSize = 1000000 if buf_size is None else buf_size # BL
         self.setBufferSize(self._bufferSize)
         
         self._deviceType = self.getDeviceType()

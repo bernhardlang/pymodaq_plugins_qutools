@@ -1,3 +1,4 @@
+import ctypes
 import numpy as np
 from threading import Thread
 from pymodaq_plugins_qutools.hardware.QuTAG_HR import QuTAG
@@ -15,7 +16,7 @@ class QuTAGController:
     SCOND_NIM   = 2
     SCOND_MISC  = 3
      
-    def __init__(self):
+    def __init__(self, time_tags_per_channel=True):
         self.initialised = False
         self.thread = None
         self.rates_callback = None
@@ -25,7 +26,9 @@ class QuTAGController:
         self.event_channels = None
         self.initialise_events = False
         self.sample_count = np.zeros(8, dtype=np.int32)
-        self.alternate_only = True 
+        self.time_tags_per_channel = time_tags_per_channel
+        self.mean_valid = 0
+        self.rms_valid = 0
 
     def __del__(self):
         if self.thread is not None:
@@ -35,7 +38,7 @@ class QuTAGController:
 
     def open_communication(self, update_interval):
         try:
-            self.qutag = QuTAG()
+            self.qutag = QuTAG(buf_size=1000)
         except:
             raise RuntimeError("Couldn't initialise QuTAG")
         self.update_interval = update_interval
@@ -132,15 +135,16 @@ class QuTAGController:
             return
         self._stop = False
         self.thread = Thread(target=self.loop)
-        self.qutag.getLastTimestamps(reset=True)
         self.thread.start()
 
     def grab_time_tags(self):
+        """Transforms list of tag lists into list of np.arrays."""
         time_tags = [np.array(t) for t in self.time_tags]
         self.time_tags = [[] for _ in range(len(self.event_channels))]
         return time_tags
 
     def grab_rates(self, now):
+        """Transforms list of counts into list of np.arrays containing rates."""
         dt = now - self.rates_start
         self.rates_start = now
         data = [np.array([self.sample_count[channel-1] / dt])
@@ -167,13 +171,15 @@ class QuTAGController:
 
 # thread matter
     def loop(self):
-        prev_channel = -1
+        self.qutag.getLastTimestamps(reset=True)
         while not self._stop:
             if not self.initialised:
                 return
 
-            result = self.qutag.getLastTimestamps(reset=True)
+            timestamps, channels, valid = \
+                self.qutag.getLastTimestamps(reset=True)
             now = time.time()
+            time.sleep(0.01)
 
             if self.initialise_events:
                 self.clear_events(now)
@@ -183,17 +189,17 @@ class QuTAGController:
                 self.clear_rates(now)
                 self.initialise_rates = False
 
-            for i in range(result[2]): # loop over all events
-                channel = result[1][i]
-                if self.alternate_only and prev_channel == channel:
-                    continue
-                prev_channel = channel
+            for i in range(valid): # loop over all events
+                channel = channels[i]
+                if self.time_tags_per_channel:
+                    try:
+                        self.time_tags[channel].append(timestamps[i] * 1e-6)
+                    except:
+                        pass
+                else:
+                    self.time_tags.append([timestamps[i] * 1e-6, channel])
                 try:
-                    self.time_tags[channel].append(result[0][i] * 1e-6)
-                except:
-                    pass
-                try:
-                    self.sample_count[result[1][i]] += 1
+                    self.sample_count[channels[i]] += 1
                 except:
                     pass
 
@@ -211,7 +217,10 @@ class QuTAGController:
                 self.clear_events(now)
 
     def clear_events(self, now):
-        self.time_tags = [[] for _ in range(len(self.event_channels))]
+        if self.time_tags_per_channel:
+            self.time_tags = [[] for _ in range(len(self.event_channels))]
+        else:
+            self.time_tags = []
         self.next_events_update = now + self.events_update_interval
 
     def clear_rates(self, now):

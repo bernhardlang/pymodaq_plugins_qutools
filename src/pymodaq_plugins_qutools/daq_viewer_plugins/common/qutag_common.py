@@ -35,10 +35,6 @@ class QutagCommon:
           'type': 'float', 'value': 1 },
         { 'title': 'Grab all enabled channels?', 'name': 'grab_enabled',
           'type': 'bool', 'value': True },
-        { 'title': 'Histogram bins', 'name': 'n_bins',
-          'type': 'bool', 'value': True },
-        { 'title': 'Calculate difference', 'name': 'calculate_difference',
-          'type': 'bool', 'value': True },
         { 'title': 'Line Settings', 'name': 'line_settings', 'type': 'group',
           'expanded': False, 'children': [
               { 'title': 'Start', 'name': 'settings_start', 'type': 'group',
@@ -63,6 +59,7 @@ class QutagCommon:
           }]
 
     live_mode_available = True
+    time_tags_per_channel = True
 
     def get_channel_from_param_name(self, parent_name):
         if parent_name == "settings_start":
@@ -126,7 +123,7 @@ class QutagCommon:
         """
 
         if self.is_master:
-            self.controller = QuTAGController()
+            self.controller = QuTAGController(self.time_tags_per_channel)
             update_interval = self.settings.child('update_interval').value()
             self.controller.open_communication(update_interval)
             initialized = self.controller.is_initialised()

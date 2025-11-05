@@ -117,3 +117,5 @@ venv.bak/
 
 # emacs
 *~
+doc/*.aux
+doc/*.pdf
