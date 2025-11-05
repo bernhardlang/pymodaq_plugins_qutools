@@ -166,6 +166,9 @@ class DAQ_1DViewer_QutagTA(QutagCommon, DAQ_Viewer_base):
         time_tags = self.controller.grab_time_tags()
         self.callback(time_tags)
 
+    start on channel one, where to implement?
+    list of grouped events?
+
     def callback(self, incoming_time_tags):
         """
         stand-alone operation (without CCD):

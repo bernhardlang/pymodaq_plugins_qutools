@@ -14,7 +14,10 @@ class DAQ_1DViewer_Qutag(QutagCommon, DAQ_Viewer_base):
     """ Instrument plugin class for a quTAG 1D viewer.
     """
 
-    params = comon_parameters + QutagCommon.common_parameters
+    params = comon_parameters + QutagCommon.common_parameters \
+        + [{ 'title': 'Use channel one as start', 'name': 'start_one_',
+             'type': 'bool', 'value': False },
+           ]
 
     def ini_attributes(self):
         self.controller: QuTAGController = None

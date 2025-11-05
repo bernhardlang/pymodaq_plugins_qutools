@@ -33,7 +33,7 @@ class QutagCommon:
     common_parameters = [
         { 'title': 'Update Interval [s]', 'name': 'update_interval',
           'type': 'float', 'value': 1 },
-        { 'title': 'Grab all enabled channels?', 'name': 'grab_enabled',
+        { 'title': 'Grab all enabled channels', 'name': 'grab_enabled',
           'type': 'bool', 'value': True },
         { 'title': 'Line Settings', 'name': 'line_settings', 'type': 'group',
           'expanded': False, 'children': [
