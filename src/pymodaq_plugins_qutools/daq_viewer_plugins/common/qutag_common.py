@@ -179,6 +179,58 @@ class QutagCommon:
         return channels
 
 
+class QutagCommonHistogram(QutagCommon):
+
+    params = comon_parameters + QutagCommon.common_parameters \
+     + [{ 'title': 'Histogram bins', 'name': 'histogram_bins', 'type': 'int',
+          'min': 2, 'value': 20 },
+       ]
+
+    def grab_data(self, Naverage=1, **kwargs):
+        """Start a grab from the detector
+
+        Parameters
+        ----------
+        Naverage: int
+            Number of hardware averaging (if hardware averaging is possible,
+            self.hardware_averaging should be set to
+            True in class preamble and you should code this implementation)
+        kwargs: dict
+            others optionals arguments
+        """
+        if not self.controller.collecting_events: # first call?
+            channels = self.determine_active_channels()
+            self.channel_labels = ['channel %d' % c for c in channels]
+
+        if 'live' in kwargs:
+            if kwargs['live']:
+                self.live = True
+                update_interval = self.settings.child("update_interval").value()
+                self.n_bins = self.settings.child("histogram_bins").value()
+                time_tags_per_channel = self.start_live()
+                self.controller.start_events(channels, self.callback,
+                                             update_interval,
+                                             time_tags_per_channel)
+            elif self.live:
+                self.live = False
+                self.controller.stop_events()
+            return
+
+        if not self.controller.collecting_events:
+            self.controller.start_events(channels)
+            return
+
+        time_tags = self.controller.grab_time_tags()
+        self.callback(time_tags)
+
+    def stop(self):
+        """Stop the current grab hardware wise if necessary"""
+        self.controller.stop_events()
+        self.emit_status(ThreadCommand('Update_Status', ['quTAG hist halted']))
+        return ''
+
+
+
 class Histogram:
 
     def __init__(self, n_bins, min_val=None, max_val=None):

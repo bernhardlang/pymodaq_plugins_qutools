@@ -7,83 +7,29 @@ from pymodaq_utils.utils import ThreadCommand
 from pymodaq.utils.data import DataFromPlugins
 from pymodaq_plugins_qutools.hardware.qutag_controller import QuTAGController
 from pymodaq_plugins_qutools.daq_viewer_plugins.common.qutag_common \
-    import QutagCommon, Histogram
+    import QutagCommonHistogram, Histogram
 
-class DAQ_1DViewer_QutagTA(QutagCommon, DAQ_Viewer_base):
+class DAQ_1DViewer_QutagTA(QutagCommonHistogram, DAQ_Viewer_base):
     """ Instrument plugin class for a quTAG 1D viewer.
     """
 
-    params = comon_parameters + QutagCommon.common_parameters \
+    params = QutagCommonHistogram.params \
      + [{ 'title': 'Stand-alone', 'name': 'standalone', 'type': 'bool',
           'value': True },
-        { 'title': 'Histogram bins', 'name': 'histogram_bins', 'type': 'int',
-          'min': 2, 'value': 20 },
        ]
 
     def ini_attributes(self):
         self.controller: QuTAGController = None
-        self.n_bins = 20
         self.live = False
 
-    def grab_data(self, Naverage=1, **kwargs):
-        """Start a grab from the detector
-
-        Parameters
-        ----------
-        Naverage: int
-            Number of hardware averaging (if hardware averaging is possible,
-            self.hardware_averaging should be set to
-            True in class preamble and you should code this implementation)
-        kwargs: dict
-            others optionals arguments
-        """
-        if not self.controller.collecting_events: # first call?
-            channels = self.determine_active_channels()
-            self.channel_labels = ['channel %d' % c for c in channels]
-
+    def start_live(self):
         self.standalone = self.settings.child("standalone").value()
         self.time_tags = []
         self.idx = 0
-        if 'live' in kwargs:
-            if kwargs['live']:
-                self.live = True
-                update_interval = self.settings.child("update_interval").value()
-                self.ch_one_as_start = \
-                    self.settings.child("ch_one_as_start").value()
-                self.n_bins = self.settings.child("histogram_bins").value()
-                self.time_tags = []
-                self.tags_on_channel = np.empty(3)
-                self.increment = 3 if self.standalone else 5
-                self.controller.start_events(channels, self.callback,
-                                             update_interval, False)
-            elif self.live:
-                self.live = False
-                self.controller.stop_events()
-            return
-
-        if not self.controller.collecting_events:
-            self.controller.start_events(channels)
-            return
-
-        time_tags = self.controller.grab_time_tags()
-        self.callback(time_tags)
+        self.tags_on_channel = np.empty(3)
+        return False
 
     def callback(self, incoming_time_tags):
-        """
-        stand-alone operation (without CCD):
-        sequence 1: PD ps, PD fs, PD fs -> ch 0, 1, 1
-        sequence 2: PD fs, PD ps, PD fs -> ck 1, 0, 1
-        - identfy event on channel 0
-        - check delay to event on channel 1 after
-        - delay > 900µs ? take event on channel 1 before : after
-
-        normal operation (with CCD):
-        sequence 1: PD ps, PD fs, XCK, PD fs -> ch 0, 1, 2, 1
-        sequence 2: PD fs, PD ps, XCK, PD fs -> ck 1, 0, 2, 1
-        - identfy event on channel 2
-        - take events on channel 0 and 1 before
-        """
-
         self.time_tags = self.time_tags + incoming_time_tags
         n_tt = len(self.time_tags)
         self.hist_ps = Histogram(self.n_bins)
@@ -132,12 +78,6 @@ class DAQ_1DViewer_QutagTA(QutagCommon, DAQ_Viewer_base):
                                               label='', units='', index=0)])
         self.dte_signal.emit(DataToExport(name='qutag',
                                           data=[dfp0, dfp1, dfp_diff]))
-
-    def stop(self):
-        """Stop the current grab hardware wise if necessary"""
-        self.controller.stop_events()
-        self.emit_status(ThreadCommand('Update_Status', ['quTAG hist halted']))
-        return ''
 
 
 if __name__ == '__main__':
