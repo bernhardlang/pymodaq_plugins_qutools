@@ -16,10 +16,10 @@ class DAQ_1DViewer_QutagTA(QutagCommon, DAQ_Viewer_base):
     params = comon_parameters + QutagCommon.common_parameters \
      + [{ 'title': 'Stand-alone', 'name': 'standalone', 'type': 'bool',
           'value': True },
-        { 'title': 'Histogram bins', 'name': 'n_bins',
-          'type': 'bool', 'value': True },
-        { 'title': 'Calculate difference', 'name': 'calculate_difference',
-          'type': 'bool', 'value': True },
+        { 'title': 'Histogram bins', 'name': 'histogram_bins', 'type': 'int',
+          'min': 2, 'value': 20 },
+        { 'title': 'Use channel one as start', 'name': 'ch_one_as_start',
+             'type': 'bool', 'value': False },
        ]
 
     def ini_attributes(self):
@@ -44,19 +44,20 @@ class DAQ_1DViewer_QutagTA(QutagCommon, DAQ_Viewer_base):
             self.channel_labels = ['channel %d' % c for c in channels]
 
         self.standalone = self.settings.child("standalone").value()
-        self.calculate_difference = \
-            self.settings.child('calculate_difference').value()
         self.time_tags = []
         self.idx = 0
         if 'live' in kwargs:
             if kwargs['live']:
                 self.live = True
                 update_interval = self.settings.child("update_interval").value()
+                self.ch_one_as_start = \
+                    self.settings.child("ch_one_as_start").value()
+                self.n_bins = self.settings.child("histogram_bins").value()
                 self.time_tags = []
                 self.tags_on_channel = np.empty(3)
                 self.increment = 3 if self.standalone else 5
                 self.controller.start_events(channels, self.callback,
-                                             update_interval)
+                                             update_interval, False)
             elif self.live:
                 self.live = False
                 self.controller.stop_events()
@@ -68,9 +69,6 @@ class DAQ_1DViewer_QutagTA(QutagCommon, DAQ_Viewer_base):
 
         time_tags = self.controller.grab_time_tags()
         self.callback(time_tags)
-
-    start on channel one, where to implement?
-    list of grouped events?
 
     def callback(self, incoming_time_tags):
         """
@@ -90,9 +88,9 @@ class DAQ_1DViewer_QutagTA(QutagCommon, DAQ_Viewer_base):
 
         self.time_tags = self.time_tags + incoming_time_tags
         n_tt = len(self.time_tags)
-        self.hist0 = Histogram(20)
-        self.hist1 = Histogram(20)
-        self.hist_diff = Histogram(20)
+        self.hist_ps = Histogram(self.n_bins)
+        self.hist_fs = Histogram(self.n_bins)
+        self.hist_diff = Histogram(self.n_bins)
 
         while True:
             # skip tags before start event on channel 0
@@ -114,22 +112,21 @@ class DAQ_1DViewer_QutagTA(QutagCommon, DAQ_Viewer_base):
                 self.idx += 1
 
             if self.standalone or self.tags_on_channel[2] > 0:
-                self.hist0.collect(self.tags_on_channel[0])
-                self.hist1.collect(self.tags_on_channel[1])
-                if self.calculate_difference:
-                    self.hist_diff.collect(self.tags_on_channel[1]
-                                           - self.tags_on_channel[0])
+                self.hist_ps.collect(self.tags_on_channel[0])
+                self.hist_fs.collect(self.tags_on_channel[1])
+                self.hist_diff.collect(self.tags_on_channel[1]
+                                       - self.tags_on_channel[0])
 
         self.time_tags = self.time_tags[self.idx:]
         self.idx = 0
 
-        dfp0 = DataFromPlugins(name='qutag', data=self.hist0.bins,
+        dfp0 = DataFromPlugins(name='qutag', data=self.hist_ps.bins,
                                dim='Data1D', labels=['ch 0'],
-                               axes=[Axis(data=self.hist0.centers,
+                               axes=[Axis(data=self.hist_ps.centers,
                                           label='', units='', index=0)])
-        dfp1 = DataFromPlugins(name='qutag', data=self.hist1.bins,
+        dfp1 = DataFromPlugins(name='qutag', data=self.hist_fs.bins,
                                dim='Data1D', labels=['ch 1'],
-                               axes=[Axis(data=self.hist1.centers,
+                               axes=[Axis(data=self.hist_fs.centers,
                                           label='', units='', index=0)])
         dfp_diff = DataFromPlugins(name='qutag', data=self.hist_diff.bins,
                                    dim='Data1D', labels=['difference'],

@@ -182,6 +182,7 @@ class QutagCommon:
 class Histogram:
 
     def __init__(self, n_bins, min_val=None, max_val=None):
+        assert type(n_bins) == int
         self.n_bins = n_bins
         if isinstance(min_val, list) or isinstance(min_val, np.ndarray):
             self.values = min_val
@@ -196,7 +197,11 @@ class Histogram:
 
     def set_up(self, min_val, max_val):
         self._centers = np.linspace(min_val, max_val, self.n_bins)
-        self.bin_width = self._centers[1] - self._centers[0]
+        try:
+            self.bin_width = self._centers[1] - self._centers[0]
+        except:
+            import pdb
+            pdb.set_trace()
         self.ranges = \
             np.linspace(min_val - self.bin_width, max_val + self.bin_width,
                         self.n_bins + 1)

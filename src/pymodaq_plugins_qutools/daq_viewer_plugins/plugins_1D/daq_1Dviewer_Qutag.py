@@ -17,6 +17,8 @@ class DAQ_1DViewer_Qutag(QutagCommon, DAQ_Viewer_base):
     params = comon_parameters + QutagCommon.common_parameters \
         + [{ 'title': 'Use channel one as start', 'name': 'ch_one_as_start',
              'type': 'bool', 'value': False },
+           { 'title': 'Histogram bins', 'name': 'histogram_bins', 'type': 'int',
+             'min': 2, 'value': 20 },
            ]
 
     def ini_attributes(self):
@@ -46,6 +48,7 @@ class DAQ_1DViewer_Qutag(QutagCommon, DAQ_Viewer_base):
                 update_interval = self.settings.child("update_interval").value()
                 self.ch_one_as_start = \
                     self.settings.child("ch_one_as_start").value()
+                self.n_bins = self.settings.child("histogram_bins").value()
                 self.start_tag = 0
                 self.controller.start_events(channels, self.callback,
                                              update_interval,
@@ -66,7 +69,8 @@ class DAQ_1DViewer_Qutag(QutagCommon, DAQ_Viewer_base):
         data = []
 
         if self.ch_one_as_start:
-            hists = [Histogram(10) for _ in range(len(self.channel_labels))]
+            hists = [Histogram(self.n_bins)
+                     for _ in range(len(self.channel_labels))]
             for tag in incoming_tags:
                 channel = int(tag[1])
                 if not channel:
@@ -87,7 +91,7 @@ class DAQ_1DViewer_Qutag(QutagCommon, DAQ_Viewer_base):
             for channel,tags in enumerate(incoming_tags):
                 if not len(tags):
                     continue
-                hist = Histogram(10, tags)
+                hist = Histogram(self.n_bins, tags)
                 dfp = DataFromPlugins(name='qutag', data=hist.bins,
                                       dim='Data1D',
                                       labels=[self.channel_labels[channel]],
