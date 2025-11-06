@@ -18,8 +18,6 @@ class DAQ_1DViewer_QutagTA(QutagCommon, DAQ_Viewer_base):
           'value': True },
         { 'title': 'Histogram bins', 'name': 'histogram_bins', 'type': 'int',
           'min': 2, 'value': 20 },
-        { 'title': 'Use channel one as start', 'name': 'ch_one_as_start',
-             'type': 'bool', 'value': False },
        ]
 
     def ini_attributes(self):
