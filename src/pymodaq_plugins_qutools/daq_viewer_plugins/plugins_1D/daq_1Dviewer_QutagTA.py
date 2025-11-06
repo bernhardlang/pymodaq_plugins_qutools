@@ -7,103 +7,8 @@ from pymodaq_utils.utils import ThreadCommand
 from pymodaq.utils.data import DataFromPlugins
 from pymodaq_plugins_qutools.hardware.qutag_controller import QuTAGController
 from pymodaq_plugins_qutools.daq_viewer_plugins.common.qutag_common \
-    import QutagCommon
+    import QutagCommon, Histogram
 
-class Histogram:
-
-    def __init__(self, n_bins, min_val=None, max_val=None):
-        self.n_bins = n_bins
-        if min_val is not None:
-            self.set_up(min_val, max_val, n_bins)
-            self._changed = False
-            self.values = None
-        else:
-            self.values = []
-
-    def set_up(self, min_val, max_val):
-        self._centers = np.linspace(min_val, max_val, self.n_bins)
-        self.bin_width = self._centers[1] - self._centers[0]
-        try:
-            assert self.bin_width
-        except:
-            import pdb
-            pdb.set_trace()
-        self.ranges = \
-            np.linspace(min_val - self.bin_width, max_val + self.bin_width,
-                        self.n_bins + 1)
-        self._bins = np.zeros(self.n_bins)
-        self.start_range = self.ranges[0]
-        self._changed = True
-
-    def _set_up(self):
-        if not len(self.values):
-            return
-        self.set_up(min(self.values), max(self.values))
-        for value in self.values:
-            self.add(value)
-
-    def add(self, value):
-        idx = int((value - self.start_range) / self.bin_width)
-        if idx >= 0:
-            try:
-                self._bins[idx] += 1
-            except:
-                pass
-
-    def collect(self, value):
-        self.values.append(value)
-
-    @property
-    def bins(self):
-        if not hasattr(self, '_bins'):
-            self._set_up()
-            self._update()
-        return self._bins
-
-    @property
-    def centers(self):
-        if not hasattr(self, '_centers'):
-            self._set_up()
-            self._update()
-        return self._centers
-
-    @property
-    def samples(self):
-        if self._changed:
-            self._update()
-        return self._samples
-
-    @property
-    def mean(self):
-        if self._changed:
-            self._update()
-        return self._mean
-    
-    @property
-    def sigma(self):
-        if self._changed:
-            self._update()
-        return self._sigma
-
-    @property
-    def normalised_bins(self):
-        if self._changed:
-            self._update()
-        return self._normalised_bins
-
-    def _update(self):
-        if not hasattr(self, '_bins'):
-            self._set_up()
-        self._samples = sum(self._bins)
-        self._normalised_bins = self._bins / (self._samples * self.bin_width)
-        self._mean = \
-            np.dot(self._normalised_bins, self._centers) * self.bin_width
-        self._sigma = \
-            np.sqrt(np.dot(self._normalised_bins,
-                           (self._centers - self._mean)**2) * self.bin_width)
-        self._changed = False
-
-    
 class DAQ_1DViewer_QutagTA(QutagCommon, DAQ_Viewer_base):
     """ Instrument plugin class for a quTAG 1D viewer.
     """
@@ -116,8 +21,6 @@ class DAQ_1DViewer_QutagTA(QutagCommon, DAQ_Viewer_base):
         { 'title': 'Calculate difference', 'name': 'calculate_difference',
           'type': 'bool', 'value': True },
        ]
-
-    time_tags_per_channel = False
 
     def ini_attributes(self):
         self.controller: QuTAGController = None
@@ -216,7 +119,7 @@ class DAQ_1DViewer_QutagTA(QutagCommon, DAQ_Viewer_base):
                 if self.calculate_difference:
                     self.hist_diff.collect(self.tags_on_channel[1]
                                            - self.tags_on_channel[0])
-                
+
         self.time_tags = self.time_tags[self.idx:]
         self.idx = 0
 

@@ -16,7 +16,7 @@ class QuTAGController:
     SCOND_NIM   = 2
     SCOND_MISC  = 3
      
-    def __init__(self, time_tags_per_channel=True):
+    def __init__(self):
         self.initialised = False
         self.thread = None
         self.rates_callback = None
@@ -26,7 +26,7 @@ class QuTAGController:
         self.event_channels = None
         self.initialise_events = False
         self.sample_count = np.zeros(8, dtype=np.int32)
-        self.time_tags_per_channel = time_tags_per_channel
+        self.time_tags_per_channel = True
         self.mean_valid = 0
         self.rms_valid = 0
 
@@ -111,9 +111,11 @@ class QuTAGController:
         edge, threshold = self.qutag.getSignalConditioning(channel)
         self.qutag.setSignalConditioning(channel, cond, edge, threshold)
 
-    def start_events(self, channels, callback=None, update_interval=None):
+    def start_events(self, channels, callback=None, update_interval=None,
+                     time_tags_per_channel=True):
         self.events_callback = callback
         self.events_update_interval = update_interval
+        self.time_tags_per_channel = time_tags_per_channel
         self.event_channels = channels
         for channel in channels:
             self.enable_channel(channel+1, True)

@@ -7,7 +7,7 @@ from pymodaq_utils.utils import ThreadCommand
 from pymodaq.utils.data import DataFromPlugins
 from pymodaq_plugins_qutools.hardware.qutag_controller import QuTAGController
 from pymodaq_plugins_qutools.daq_viewer_plugins.common.qutag_common \
-    import QutagCommon
+    import QutagCommon, Histogram
 
 
 class DAQ_1DViewer_Qutag(QutagCommon, DAQ_Viewer_base):
@@ -15,7 +15,7 @@ class DAQ_1DViewer_Qutag(QutagCommon, DAQ_Viewer_base):
     """
 
     params = comon_parameters + QutagCommon.common_parameters \
-        + [{ 'title': 'Use channel one as start', 'name': 'start_one_',
+        + [{ 'title': 'Use channel one as start', 'name': 'ch_one_as_start',
              'type': 'bool', 'value': False },
            ]
 
@@ -44,8 +44,12 @@ class DAQ_1DViewer_Qutag(QutagCommon, DAQ_Viewer_base):
             if kwargs['live']:
                 self.live = True
                 update_interval = self.settings.child("update_interval").value()
+                self.ch_one_as_start = \
+                    self.settings.child("ch_one_as_start").value()
+                self.start_tag = 0
                 self.controller.start_events(channels, self.callback,
-                                             update_interval)
+                                             update_interval,
+                                             not self.ch_one_as_start)
             elif self.live:
                 self.live = False
                 self.controller.stop_events()
@@ -58,38 +62,38 @@ class DAQ_1DViewer_Qutag(QutagCommon, DAQ_Viewer_base):
         time_tags = self.controller.grab_time_tags()
         self.callback(time_tags)
 
-    def callback(self, time_tags):
+    def callback(self, incoming_tags):
         data = []
-        if self.settings.child('calculate_difference').value():
-            n_tags = min(len(time_tags[0]), len(time_tags[1]))
-            diff = np.empty(n_tags)
-            for i in range(n_tags):
-                diff[i] = time_tags[1][i] - time_tags[0][i]
-            time_tags.append(diff)
 
-        for channel,tags in enumerate(time_tags):
-            if not len(tags):
-                continue
-            min_val = min(tags)
-            max_val = max(tags)
-            bin_size = (max_val - min_val) / self.n_bins
-            centers = np.linspace(min_val + 0.5 * bin_size,
-                                  max_val - 0.5 * bin_size, self.n_bins)
-            bins = np.zeros(self.n_bins)
-            for tag in tags:
-                idx = int((tag - min_val) / bin_size)
-                if idx >= 0 and idx < self.n_bins:
-                    bins[idx] += 1
-            try:
-                label = self.channel_labels[channel]
-            except:
-                label = 'difference'
+        if self.ch_one_as_start:
+            hists = [Histogram(10) for _ in range(len(self.channel_labels))]
+            for tag in incoming_tags:
+                channel = int(tag[1])
+                if not channel:
+                    self.start_tag = tag[0]
+                else:
+                    hists[channel].collect(tag[0] - self.start_tag)
 
-            dfp = DataFromPlugins(name='qutag', data=bins, dim='Data1D',
-                                  labels=[label],
-                                  axes=[Axis(data=centers, label='', units='',
-                                             index=0)])
-            data.append(dfp)
+            for i,hist in enumerate(hists):
+                if not hist.samples:
+                    continue
+                dfp = DataFromPlugins(name='qutag', data=hist.bins,
+                                      dim='Data1D',
+                                      labels=[self.channel_labels[i]],
+                                      axes=[Axis(data=hist.centers, label='',
+                                                 units='', index=0)])
+                data.append(dfp)
+        else:
+            for channel,tags in enumerate(incoming_tags):
+                if not len(tags):
+                    continue
+                hist = Histogram(10, tags)
+                dfp = DataFromPlugins(name='qutag', data=hist.bins,
+                                      dim='Data1D',
+                                      labels=[self.channel_labels[channel]],
+                                      axes=[Axis(data=hist.centers, label='',
+                                                 units='', index=0)])
+                data.append(dfp)
 
         self.dte_signal.emit(DataToExport(name='qutag', data=data))
 

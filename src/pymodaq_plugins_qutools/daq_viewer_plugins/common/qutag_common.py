@@ -19,14 +19,14 @@ class QutagCommon:
     ]
 
     channel_settings = conditioning + [
-        { 'title': 'Enabled?', 'name': 'enabled', 'type': 'bool',
+        { 'title': 'Enabled', 'name': 'enabled', 'type': 'bool',
           'value': True },
         { 'title': 'Get Count Rate?', 'name': 'get_count_rate', 'type': 'bool',
           'value': False },
     ]
 
     start_settings = conditioning + [
-        { 'title': 'Enabled?', 'name': 'enabled', 'type': 'bool',
+        { 'title': 'Enabled', 'name': 'enabled', 'type': 'bool',
           'value': True },
     ]
 
@@ -59,7 +59,6 @@ class QutagCommon:
           }]
 
     live_mode_available = True
-    time_tags_per_channel = True
 
     def get_channel_from_param_name(self, parent_name):
         if parent_name == "settings_start":
@@ -123,7 +122,7 @@ class QutagCommon:
         """
 
         if self.is_master:
-            self.controller = QuTAGController(self.time_tags_per_channel)
+            self.controller = QuTAGController()
             update_interval = self.settings.child('update_interval').value()
             self.controller.open_communication(update_interval)
             initialized = self.controller.is_initialised()
@@ -171,9 +170,116 @@ class QutagCommon:
         for channel in range(1,9):
             if not self.controller.get_enabled(channel):
                 continue
+            # <<-- revise this
             if self.settings.child("grab_enabled").value() \
                or self.settings.child("line_settings") \
                                .child("settings_ch%d" % channel) \
                                .child("get_count_rate").value():
                 channels.append(channel)
         return channels
+
+
+class Histogram:
+
+    def __init__(self, n_bins, min_val=None, max_val=None):
+        self.n_bins = n_bins
+        if isinstance(min_val, list) or isinstance(min_val, np.ndarray):
+            self.values = min_val
+            self._set_up()
+        elif min_val is not None:
+            self.set_up(min_val, max_val)
+            self._changed = False
+            self.values = None
+        else:
+            self.values = []
+            self._changed = True
+
+    def set_up(self, min_val, max_val):
+        self._centers = np.linspace(min_val, max_val, self.n_bins)
+        self.bin_width = self._centers[1] - self._centers[0]
+        self.ranges = \
+            np.linspace(min_val - self.bin_width, max_val + self.bin_width,
+                        self.n_bins + 1)
+        self._bins = np.zeros(self.n_bins)
+        self.start_range = self.ranges[0]
+        self._changed = True
+
+    def _set_up(self):
+        if not len(self.values):
+            self.set_up(0, 1)
+            return
+        self.set_up(min(self.values), max(self.values))
+        for value in self.values:
+            self.add(value)
+
+    def add(self, value):
+        idx = int((value - self.start_range) / self.bin_width)
+        if idx >= 0:
+            try:
+                self._bins[idx] += 1
+            except:
+                pass
+
+    def collect(self, value):
+        self.values.append(value)
+
+    @property
+    def bins(self):
+        if not hasattr(self, '_bins'):
+            self._set_up()
+            self._update()
+        return self._bins
+
+    @property
+    def centers(self):
+        if not hasattr(self, '_centers'):
+            self._set_up()
+            self._update()
+        return self._centers
+
+    @property
+    def samples(self):
+        if self._changed:
+            self._update()
+        return self._samples
+
+    @property
+    def mean(self):
+        if self._changed:
+            self._update()
+        return self._mean
+    
+    @property
+    def sigma(self):
+        if self._changed:
+            self._update()
+        return self._sigma
+
+    @property
+    def normalised_bins(self):
+        if self._changed:
+            self._update()
+        return self._normalised_bins
+
+    def _update(self):
+        if not hasattr(self, '_bins'):
+            self._set_up()
+            if not len(self.values):
+                self._samples = 0
+                self._normalised_bins = self._bins
+                self._mean = 0
+                self._sigma = 0
+                self._changed = False
+                return
+            self.values = []
+
+        self._samples = sum(self._bins)
+        self._normalised_bins = self._bins / (self._samples * self.bin_width)
+        self._mean = \
+            np.dot(self._normalised_bins, self._centers) * self.bin_width
+        self._sigma = \
+            np.sqrt(np.dot(self._normalised_bins,
+                           (self._centers - self._mean)**2)
+                    * self.bin_width)
+
+        self._changed = False
