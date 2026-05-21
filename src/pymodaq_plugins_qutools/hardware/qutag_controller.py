@@ -8,7 +8,7 @@ import time
 def replace_char(string, pos, char):
     return string[:pos] + char + string[pos+1:]
 # Could simply be string[pos] = char. However, in Python some features are
-# simply broken by design :-/
+# just broken by design ;-/
 
 class QuTAGController:
 
@@ -17,7 +17,7 @@ class QuTAGController:
     SCOND_MISC  = 3
      
     def __init__(self):
-        self.initialised = False
+        self._initialised = False
         self.thread = None
         self.rates_callback = None
         self.rate_channels = None
@@ -42,16 +42,17 @@ class QuTAGController:
         except:
             raise RuntimeError("Couldn't initialise QuTAG")
         self.update_interval = update_interval
-        self.initialised = True
+        self._initialised = True
 
     def close_communication(self):
-        if self.initialised:
+        if self._initialised:
             self.stop_tagging()
             self.qutag.deInitialize()
-            self.initialised = False
+            self._initialised = False
 
-    def is_initialised(self):
-        return self.initialised
+    @property
+    def initialised(self):
+        return self._initialised
 
     @property
     def collecting_events(self):
@@ -64,7 +65,8 @@ class QuTAGController:
     def set_update_interval(self, interval):
         self.update_interval = interval
 
-    def get_enabled_channels(self):
+    @property
+    def enabled_channels(self):
         start_enabled, enabled_channels = self.qutag.getChannelsEnabled()
         while len(enabled_channels) < 8:
             enabled_channels = '0' + enabled_channels
@@ -130,22 +132,22 @@ class QuTAGController:
             self.enable_channel(channel+1, True)
         self.initialise_rates = True
         self.start_rates = True
-        self.start_tagging()
+        self._start_tagging()
 
-    def start_tagging(self):
+    def _start_tagging(self):
         if self.thread is not None:
             return
         self._stop = False
-        self.thread = Thread(target=self.loop)
+        self.thread = Thread(target=self._loop)
         self.thread.start()
 
-    def grab_time_tags(self):
+    def _grab_time_tags(self):
         """Transforms list of tag lists into list of np.arrays."""
         time_tags = [np.array(t) for t in self.time_tags]
         self.time_tags = [[] for _ in range(len(self.event_channels))]
         return time_tags
 
-    def grab_rates(self, now):
+    def _grab_rates(self, now):
         """Transforms list of counts into list of np.arrays containing rates."""
         dt = now - self.rates_start
         self.rates_start = now
@@ -153,29 +155,29 @@ class QuTAGController:
                 for channel in self.rate_channels]
         self.sample_count.fill(0)
         return data
-        
+
     def stop_events(self):
         self.events_callback = None
         if self.rates_callback is None:
-            self.stop_tagging()
+            self._stop_tagging()
         self.event_channels = None
 
     def stop_rates(self):
         self.rates_callback = None
         if self.events_callback is None:
-            self.stop_tagging()
+            self._stop_tagging()
 
-    def stop_tagging(self):
+    def _stop_tagging(self):
         if self.thread is not None:
             self._stop = True
             self.thread.join()
             self.thread = None
 
 # thread matter
-    def loop(self):
-        self.qutag.getLastTimestamps(reset=True)
+    def _loop(self):
+        self.qutag.getLastTimestamps(reset=True) # clear all
         while not self._stop:
-            if not self.initialised:
+            if not self._initialised:
                 return
 
             timestamps, channels, valid = \
@@ -184,11 +186,11 @@ class QuTAGController:
             time.sleep(0.01)
 
             if self.initialise_events:
-                self.clear_events(now)
+                self._clear_events(now)
                 self.initialise_events = False
 
             if self.initialise_rates:
-                self.clear_rates(now)
+                self._clear_rates(now)
                 self.initialise_rates = False
 
             for i in range(valid): # loop over all events
@@ -197,35 +199,37 @@ class QuTAGController:
                     try:
                         self.time_tags[channel].append(timestamps[i] * 1e-6)
                     except:
-                        pass
+                        pass # got nothing, ignore channel
                 else:
                     self.time_tags.append([timestamps[i] * 1e-6, channel])
                 try:
                     self.sample_count[channels[i]] += 1
                 except:
-                    pass
+                    pass # got nothing, ignore channel
 
-            if not self.initialise_rates and self.rates_callback is not None \
-               and now > self.next_rates_update:
+            #if not self.initialise_rates and self.rates_callback is not None \
+                #and now > self.next_rates_update:
+            if self.rates_callback is not None and now > self.next_rates_update:
                 rates = self.grab_rates(now)
                 if len(rates):
                     self.rates_callback(rates)
-                self.clear_rates(now)
+                self._clear_rates(now)
 
-            if not self.initialise_events and self.events_callback is not None \
+            #if not self.initialise_events and self.events_callback is not None \
+            if self.events_callback is not None \
                and now > self.next_events_update:
                 time_tags = self.grab_time_tags()
                 self.events_callback(time_tags)
-                self.clear_events(now)
+                self._clear_events(now)
 
-    def clear_events(self, now):
+    def _clear_events(self, now):
         if self.time_tags_per_channel:
             self.time_tags = [[] for _ in range(len(self.event_channels))]
         else:
             self.time_tags = []
         self.next_events_update = now + self.events_update_interval
 
-    def clear_rates(self, now):
+    def _clear_rates(self, now):
         self.sample_count = np.zeros(len(self.rate_channels))
         self.next_rates_update = now + self.rates_update_interval
         self.rates_start = now
