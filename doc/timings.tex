@@ -1,81 +1,245 @@
 \documentclass[a4paper,12pt]{article}
 \usepackage{a4wide,tikz}
-\usepackage[landscape]{geometry}
 \parindent=0cm
 \begin{document}
+\section{Fs trigger}
+\subsection{Conventional}
 \begin{tikzpicture}
   \def\yin{4.8}
   \def\yfs{3.6}
-  \def\yccd{2.4}
-  \def\yxck{1.2}
-  \def\ychop{0}
+  \def\ychop{2.4}
+  \def\yccd{1.2}
+  \def\yxck{0}
   \draw (0,\yin) -- ++(0.2,0);
-  \foreach \x in {0.2,2.2,...,14.2}
+  \foreach \x in {0.2,2.2,...,10.2}
     \draw (\x,\yin) -- ++(0,1) -- ++(0.1,0) -- ++(0,-1) -- ++(1.9,0);
-%  \draw (16,\yin) -- ++(1.9,0);
   \draw(-1.5,\yin+0.5) node {Laser in};
   %
   \draw (0,\yfs) -- ++(0.4,0);
-  \foreach \x in {0.4,2.4,...,14.4}
+  \foreach \x in {0.4,2.4,...,8.4}
     \draw (\x,\yfs) -- ++(0,1) -- ++(0.1,0) -- ++(0,-1) -- ++(1.9,0);
-%  \draw (16.2,\yfs) -- ++(1.7,0);
-  \draw(-1.5,\yfs+0.5) node {\underline{PD fs}};
+  \draw (10.4,\yfs) -- ++(0,1) -- ++(0.1,0) -- ++(0,-1) -- ++(1.7,0);
+  \draw(-1.5,\yfs+0.5) node {fs light};
+  %
+  \draw (0,\ychop) -- ++(1.6,0);
+  \foreach \x in {1.6,5.6}
+    \draw (\x,\ychop) -- ++(0,1) -- ++(2,0) -- ++(0,-1) -- ++(2,0);
+  \draw (9.6,\ychop) -- ++(0,1) -- ++(2,0) -- ++(0,-1) -- ++(0.7,0);
+  \draw(-1.5,\ychop+0.5) node {Chopper};
   %
   \draw (0,\yccd) -- ++(0.6,0);
-  \foreach \x in {0.6,2.6,...,14.6}
+  \foreach \x in {0.6,2.6,...,8.6}
     \draw (\x,\yccd) -- ++(0,1) -- ++(0.1,0) -- ++(0,-1) -- ++(1.9,0);
-%  \draw (16.4,\yccd) -- ++(1.5,0);
+  \draw (10.6,\yccd) -- ++(0,1) -- ++(0.1,0) -- ++(0,-1) -- ++(1.5,0);
+  \draw(-1.5,\yccd+0.5) node {Trigger CCD};
+  %
+  \draw (0,\yxck) -- ++(2.7,0);
+  \foreach \x in {2.7,4.7,...,8.7}
+    \draw (\x,\yxck) -- ++(0,1) -- ++(1.3,0) -- ++(0,-1) -- ++(0.7,0);
+  \draw (10.7,\yxck) -- ++(0,1) -- ++(1.3,0) -- ++(0,-1) -- ++(0.2,0);
+  \draw(-1.5,\yxck+0.5) node {XCK};
+  %
+\end{tikzpicture}
+\medskip
+
+\begin{tabular}{llll}
+  Laser in & \texttt{In 1} & \texttt{TCLK0} & \texttt{D22} \\
+  Chopper & \texttt{S1} & & \\
+  Trigger CCD & \texttt{Out 1} & \texttt{TIOA0} & \texttt{D2} \\
+  Shutter pump & \texttt{Out 6} & \texttt{TIOA8} & \texttt{D11} \\
+  Shutter wl & \texttt{Out 4} & \texttt{TIOA6} & \texttt{D5} \\
+  Debug chopper pump & \texttt{Out 3} & \texttt{TIOB2} & \texttt{D32}
+\end{tabular}
+
+\begin{itemize}
+\item
+\texttt{TC0} triggered on external event \texttt{TCLK0} (\texttt{laser in}), retriggered
+\item chopper phase into \texttt{S1}
+\item free running CCD acquisition, throw first pair of scans (i.e.\ one item)
+\item chopper simulated for debugging with \ldots
+\end{itemize}
+
+\clearpage
+
+\subsection{Scatter removal}
+\begin{tikzpicture}
+  \def\yin{6}
+  \def\yfs{4.8}
+  \def\ychopone{3.6}
+  \def\ychoptwo{2.4}
+  \def\yccd{1.2}
+  \def\yxck{0}
+  \draw (0,\yin) -- ++(0.2,0);
+  \foreach \x in {0.2,2.2,...,10.2}
+    \draw (\x,\yin) -- ++(0,1) -- ++(0.1,0) -- ++(0,-1) -- ++(1.9,0);
+  \draw(-1.5,\yin+0.5) node {Laser in};
+  %
+  \draw (0,\yfs) -- ++(0.4,0);
+  \foreach \x in {0.4,2.4,...,8.4}
+    \draw (\x,\yfs) -- ++(0,1) -- ++(0.1,0) -- ++(0,-1) -- ++(1.9,0);
+  \draw (10.4,\yfs) -- ++(0,1) -- ++(0.1,0) -- ++(0,-1) -- ++(1.7,0);
+  \draw(-1.5,\yfs+0.5) node {fs light};
+  %
+  \draw (0,\ychopone) -- ++(1.5,0) -- ++(0,1) -- ++(4,0) -- ++(0,-1) -- ++(4,0)
+  -- ++(0,1) -- ++(2.7,0);
+  \draw(-1.5,\ychopone+0.5) node {Chopper 1};
+  %
+  \draw (0,\ychoptwo) -- ++(3.5,0) -- ++(0,1) -- ++(4,0) -- ++(0,-1) -- ++(4,0)
+  -- ++(0,1) -- ++(0.7,0);
+  \draw(-1.5,\ychoptwo+0.5) node {Chopper 2};
+  %
+  \draw (0,\yccd) -- ++(0.6,0);
+  \foreach \x in {0.6,2.6,...,8.6}
+    \draw (\x,\yccd) -- ++(0,1) -- ++(0.1,0) -- ++(0,-1) -- ++(1.9,0);
+  \draw (10.6,\yccd) -- ++(0,1) -- ++(0.1,0) -- ++(0,-1) -- ++(1.5,0);
   \draw(-1.5,\yccd+0.5) node {Trigger CCD};
   %
   \draw (0,\yxck) -- ++(4.7,0);
-  \foreach \x in {4.7,6.7,...,14.7}
+  \foreach \x in {4.7,6.7,...,8.7}
     \draw (\x,\yxck) -- ++(0,1) -- ++(1.3,0) -- ++(0,-1) -- ++(0.7,0);
-%  \draw (17.8,\yxck) -- ++(0.1,0);
-  \draw(-1.5,\yxck+0.5) node {\underline{XCK}};
-  %
-  \draw (0,\ychop) -- ++(3.6,0);
-  \foreach \x in {3.6,7.6,11.6}
-    \draw (\x,\ychop) -- ++(0,1) -- ++(2,0) -- ++(0,-1) -- ++(2,0);
-%  \draw (16.9,\ychop) -- ++(1,0);
-  \draw(-1.5,\ychop+0.5) node {Chopper};
+  \draw (10.7,\yxck) -- ++(0,1) -- ++(1.3,0) -- ++(0,-1) -- ++(0.2,0);
+  \draw(-1.5,\yxck+0.5) node {XCK};
   %
 \end{tikzpicture}
-\smallskip
 
-a)\\
-\begin{tikzpicture}
-  \def\ytrigps{1.2}
-  \def\yps{0}
-  \draw (0,\ytrigps) -- ++(3.8,0);
-  \foreach \x in {3.8,7.8,11.8}
-    \draw (\x,\ytrigps)-- ++(0,1) -- ++(0.3,0) -- ++(0,-1) -- ++(3.7,0);
-%  \draw (16.4,\ytrigps) -- ++(1.9,0);
-  \draw(-1.5,\ytrigps+0.5) node {\underline{Trigger ps}};
-  %
-  \draw (0,\yps) -- ++(4.1,0);
-  \foreach \x in {4.1,8.1,12.1}
-    \draw (\x,\yps) -- ++(0,1) -- ++(0.1,0) -- ++(0,-1) -- ++(3.9,0);
-%  \draw (16.4,\yps) -- ++(1.9,0);
-  \draw(-1.5,\yps+0.5) node {\underline{PD ps}};
-  %
-\end{tikzpicture}
-\smallskip
+As conventional, chopper whitelight into \texttt{S2}.
+%
+Debug chopper 2 \texttt{TIOA7}, \texttt{Out 5}, \texttt{D3}.
 
-b)\\
-\begin{tikzpicture}
-  \def\ytrigps{1.2}
-  \def\yps{0}
-  \draw (0,\ytrigps) -- ++(3.8,0);
-  \foreach \x in {3.8,7.8,11.8}
-    \draw (\x,\ytrigps)-- ++(0,1) -- ++(0.3,0) -- ++(0,-1) -- ++(3.7,0);
-%  \draw (16.4,\ytrigps) -- ++(1.9,0);
-  \draw(-1.5,\ytrigps+0.5) node {\underline{Trigger ps}};
+\clearpage
+
+\section{Ps trigger}
+\subsection{Conventional}
+\begin{tikzpicture}[scale=0.79]
+  \def\yo{7.2}
+  \def\yin{6}
+  \def\yfs{4.8}
+  \def\yccd{3.6}
+  \def\ytrigps{2.4}
+  \def\yps{1.2}
+  \def\yxck{0}
+  \draw (-1,\yo) -- ++(2.6,0) -- ++(0,1) -- ++(14.5,0);
+  \draw(-2.5,\yo+0.5) node {CCD O};
   %
-  \draw (0,\yps) -- ++(4.1,0);
-  \foreach \x in {4.1,8.1,12.1}
+  \draw (-1,\yin) -- ++(1.2,0);
+  \foreach \x in {0.2,2.2,...,14.2}
+    \draw (\x,\yin) -- ++(0,1) -- ++(0.1,0) -- ++(0,-1) -- ++(1.9,0);
+  \draw(-2.5,\yin+0.5) node {Laser in};
+  %
+  \draw (-1,\yfs) -- ++(1.4,0);
+  \foreach \x in {0.4,2.4,...,12.4}
+    \draw (\x,\yfs) -- ++(0,1) -- ++(0.1,0) -- ++(0,-1) -- ++(1.9,0);
+  \draw (14.4,\yfs) -- ++(0,1) -- ++(0.1,0) -- ++(0,-1) -- ++(1.7,0);
+  \draw(-2.5,\yfs+0.5) node {PD fs};
+  %
+  \draw (-1,\yccd) -- ++(3.6,0);
+  \foreach \x in {2.6,4.6,...,12.6}
+    \draw (\x,\yccd) -- ++(0,1) -- ++(0.1,0) -- ++(0,-1) -- ++(1.9,0);
+  \draw (14.6,\yccd) -- ++(0,1) -- ++(0.1,0) -- ++(0,-1) -- ++(1.5,0);
+  \draw(-2.5,\yccd+0.5) node {Trigger CCD};
+  %
+  \draw (-1,\ytrigps) -- ++(6.8,0);
+  \foreach \x in {5.8,9.8}
+    \draw (\x,\ytrigps)-- ++(0,1) -- ++(0.3,0) -- ++(0,-1) -- ++(3.7,0);
+  \draw (13.8,\ytrigps)-- ++(0,1) -- ++(0.3,0) -- ++(0,-1) -- ++(2.2,0);
+  \draw(-2.5,\ytrigps+0.5) node {Trigger ps};
+  %
+  \draw (-1,\yps) -- ++(7.1,0);
+  \foreach \x in {6.1,10.1}
     \draw (\x,\yps) -- ++(0,1) -- ++(0.1,0) -- ++(0,-1) -- ++(3.9,0);
-%  \draw (16.4,\yps) -- ++(1.9,0);
-  \draw(-1.5,\yps+0.5) node {\underline{PD ps}};
+  \draw (14.1,\yps) -- ++(0,1) -- ++(0.1,0) -- ++(0,-1) -- ++(2.1,0);
+  \draw(-2.5,\yps+0.5) node {PD ps};
+  %
+  \draw (-1,\yxck) -- ++(3.7,0);
+  \foreach \x in {2.7,4.7,...,12.7}
+    \draw (\x,\yxck) -- ++(0,1) -- ++(1.3,0) -- ++(0,-1) -- ++(0.7,0);
+  \draw (14.7,\yxck) -- ++(0,1) -- ++(1.3,0) -- ++(0,-1) -- ++(0.3,0);
+  \draw(-2.5,\yxck+0.5) node {XCK};
   %
 \end{tikzpicture}
+\medskip
+
+\begin{tabular}{llll}
+  Laser in & \texttt{In 1} & \texttt{TCLK0} & \texttt{D22} \\
+  CCD O in & \texttt{In 2} & \texttt{??} & \\
+  Trigger CCD & \texttt{Out 1} & \texttt{TIOA0} & \texttt{D2} \\
+  Trigger PS & \texttt{Out 2} & \texttt{TIOA1} & \texttt{A7} \\
+  Shutter & \texttt{Out 4} & \texttt{TIOA6} & \texttt{D5} \\
+  debug kHz & \texttt{Out 4} & \texttt{TIOA6} & \texttt{D5} \\
+  debug fs & \texttt{Out 3} & \texttt{TIOB2} & \texttt{A4} \\
+  debug ps & \texttt{Out 6} & \texttt{TIOA8} & \texttt{D11}
+\end{tabular}
+
+\begin{itemize}
+\item \texttt{CCD O} to \texttt{In 2} as handshake for ``CCD ready'', start synchronous
+  triggering, one or two scans can be dropped
+\item
+\texttt{TC0} triggered on external event \texttt{TCLK0} (\texttt{laser in}), retriggered
+\item Count output pulses on \texttt{TIOA0}, stop after scans per block
+\item
+\texttt{TC1} triggered on external event \texttt{TCLK0}, enabled on every other external
+  event trigger, not retriggered
+\item debug laser trigger: \texttt{TC6} free running clock on
+  \texttt{TIOA6} / \texttt{Out 4}
+\item debug fs PD: \texttt{TC2} triggered on external event \texttt{TCLK0},
+  \texttt{TIOA2} / \texttt{Out 3}
+\item debug ps PD: \texttt{TC8} triggered on external event \texttt{TIOA6} rising slope
+  \texttt{TIOA2} / \texttt{Out 3}, no retrigger, steered by main trigger interrupt
+\end{itemize}
+
+\subsection{Scatter removal}
+\begin{tikzpicture}[scale=0.79]
+  \def\yo{7.2}
+  \def\yin{6}
+  \def\yfs{4.8}
+  \def\yccd{3.6}
+  \def\ytrigps{2.4}
+  \def\yps{1.2}
+  \def\yxck{0}
+  \def\ychop{-1.2}
+  \draw (-1,\yo) -- ++(2.6,0) -- ++(0,1) -- ++(14.5,0);
+  \draw(-2.5,\yo+0.5) node {CCD O};
+  %
+  \draw (-1,\yin) -- ++(1.2,0);
+  \foreach \x in {0.2,2.2,...,14.2}
+    \draw (\x,\yin) -- ++(0,1) -- ++(0.1,0) -- ++(0,-1) -- ++(1.9,0);
+  \draw(-2.5,\yin+0.5) node {Laser in};
+  %
+  \draw (-1,\yfs) -- ++(1.4,0);
+  \foreach \x in {0.4,2.4,...,12.4}
+    \draw (\x,\yfs) -- ++(0,1) -- ++(0.1,0) -- ++(0,-1) -- ++(1.9,0);
+  \draw (14.4,\yfs) -- ++(0,1) -- ++(0.1,0) -- ++(0,-1) -- ++(1.7,0);
+  \draw(-2.5,\yfs+0.5) node {PD fs};
+  %
+  \draw (-1,\yccd) -- ++(3.6,0);
+  \foreach \x in {2.6,4.6,...,12.6}
+    \draw (\x,\yccd) -- ++(0,1) -- ++(0.1,0) -- ++(0,-1) -- ++(1.9,0);
+  \draw (14.6,\yccd) -- ++(0,1) -- ++(0.1,0) -- ++(0,-1) -- ++(1.5,0);
+  \draw(-2.5,\yccd+0.5) node {Trigger CCD};
+  %
+  \draw (-1,\ytrigps) -- ++(6.8,0);
+  \foreach \x in {5.8,9.8}
+    \draw (\x,\ytrigps)-- ++(0,1) -- ++(0.3,0) -- ++(0,-1) -- ++(3.7,0);
+  \draw (13.8,\ytrigps)-- ++(0,1) -- ++(0.3,0) -- ++(0,-1) -- ++(2.2,0);
+  \draw(-2.5,\ytrigps+0.5) node {Trigger ps};
+  %
+  \draw (-1,\yps) -- ++(7.1,0);
+  \foreach \x in {6.1,10.1}
+    \draw (\x,\yps) -- ++(0,1) -- ++(0.1,0) -- ++(0,-1) -- ++(3.9,0);
+  \draw (14.1,\yps) -- ++(0,1) -- ++(0.1,0) -- ++(0,-1) -- ++(2.1,0);
+  \draw(-2.5,\yps+0.5) node {PD ps};
+  %
+  \draw (-1,\yxck) -- ++(3.7,0);
+  \foreach \x in {2.7,4.7,...,12.7}
+    \draw (\x,\yxck) -- ++(0,1) -- ++(1.3,0) -- ++(0,-1) -- ++(0.7,0);
+  \draw (14.7,\yxck) -- ++(0,1) -- ++(1.3,0) -- ++(0,-1) -- ++(0.3,0);
+  \draw(-2.5,\yxck+0.5) node {XCK};
+  %
+  \draw (-1,\ychop+1) -- ++(2.5,0) -- ++(0,-1) -- ++(4,0) -- ++(0,1) -- ++(4,0)
+  -- ++(0,-1) -- ++(4,0) -- ++(0,1) -- ++(2.8,0);
+  \draw(-2.5,\ychop+0.5) node {Chopper};
+  %
+\end{tikzpicture}
+
+As conventional, chopper into \texttt{S2} with software loop, start measurement only after change from high to low, debug chopper on \texttt{Out 5}, \texttt{TC7}
 \end{document}

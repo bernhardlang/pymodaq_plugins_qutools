@@ -229,3 +229,14 @@ class QuTAGController:
         self.sample_count = np.zeros(len(self.rate_channels))
         self.next_rates_update = now + self.rates_update_interval
         self.rates_start = now
+
+
+class MockQuTAGController(QuTAGController):
+
+    def __init__(self):
+        QuTAGController.__init__(self)
+        self.rates = np.zeros(8)
+        self.events = np.zeros(8)
+
+
+    

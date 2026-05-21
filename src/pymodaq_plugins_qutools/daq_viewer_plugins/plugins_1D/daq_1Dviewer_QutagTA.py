@@ -10,7 +10,7 @@ from pymodaq_plugins_qutools.daq_viewer_plugins.common.qutag_common \
     import QutagCommonHistogram, Histogram
 
 class DAQ_1DViewer_QutagTA(QutagCommonHistogram, DAQ_Viewer_base):
-    """ Instrument plugin class for a quTAG 1D viewer.
+    """ Instrument plugin class for a quTAG 1D viewer in picosecond TA experiment.
     """
 
     params = QutagCommonHistogram.params \
