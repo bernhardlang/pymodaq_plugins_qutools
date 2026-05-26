@@ -1,4 +1,4 @@
-import ctypes
+import ctypes, random
 import numpy as np
 from threading import Thread
 from pymodaq_plugins_qutools.hardware.QuTAG_HR import QuTAG
@@ -21,20 +21,17 @@ class QuTAGController:
         self.thread = None
         self.rates_callback = None
         self.rate_channels = None
-        self.initialise_rates = False
+        self._initialise_rates = False
         self.events_callback = None
         self.event_channels = None
-        self.initialise_events = False
+        self._initialise_events = False
         self.sample_count = np.zeros(8, dtype=np.int32)
         self.time_tags_per_channel = True
         self.mean_valid = 0
         self.rms_valid = 0
 
     def __del__(self):
-        if self.thread is not None:
-            self.stop()
-        if self.initialised:
-            self.qutag.deInitialize()
+        self.close_communication()
 
     def open_communication(self, update_interval):
         try:
@@ -121,8 +118,8 @@ class QuTAGController:
         self.event_channels = channels
         for channel in channels:
             self.enable_channel(channel+1, True)
-        self.initialise_events = True
-        self.start_tagging()
+        self._initialise_events = True
+        self._start_tagging()
 
     def start_rates(self, channels, callback=None, update_interval=None):
         self.rates_callback = callback
@@ -130,8 +127,7 @@ class QuTAGController:
         self.rate_channels = channels
         for channel in channels:
             self.enable_channel(channel+1, True)
-        self.initialise_rates = True
-        self.start_rates = True
+        self._initialise_rates = True
         self._start_tagging()
 
     def _start_tagging(self):
@@ -141,13 +137,20 @@ class QuTAGController:
         self.thread = Thread(target=self._loop)
         self.thread.start()
 
-    def _grab_time_tags(self):
+    def _get_time_stamps(self):
+        timestamps, channels, valid = \
+            self.qutag.getLastTimestamps(reset=True)
+        now = time.time()
+        time.sleep(0.01)
+        return timestamps, channels, valid
+
+    def _get_time_tags(self):
         """Transforms list of tag lists into list of np.arrays."""
-        time_tags = [np.array(t) for t in self.time_tags]
-        self.time_tags = [[] for _ in range(len(self.event_channels))]
+        time_tags = [np.array(t) for t in self._time_tags]
+        self._time_tags = [[] for _ in range(len(self.event_channels))]
         return time_tags
 
-    def _grab_rates(self, now):
+    def _get_rates(self, now):
         """Transforms list of counts into list of np.arrays containing rates."""
         dt = now - self.rates_start
         self.rates_start = now
@@ -180,53 +183,48 @@ class QuTAGController:
             if not self._initialised:
                 return
 
-            timestamps, channels, valid = \
-                self.qutag.getLastTimestamps(reset=True)
-            now = time.time()
-            time.sleep(0.01)
+            timestamps, channels, valid = self._get_time_stamps()
 
-            if self.initialise_events:
+            if self._initialise_events:
                 self._clear_events(now)
-                self.initialise_events = False
+                self._initialise_events = False
 
-            if self.initialise_rates:
+            if self._initialise_rates:
                 self._clear_rates(now)
-                self.initialise_rates = False
+                self._initialise_rates = False
 
-            for i in range(valid): # loop over all events
+            for i in range(valid): # loop over all events and add them to the
+                # corresponding tag list
                 channel = channels[i]
                 if self.time_tags_per_channel:
                     try:
-                        self.time_tags[channel].append(timestamps[i] * 1e-6)
+                        self._time_tags[channel].append(timestamps[i] * 1e-6)
                     except:
                         pass # got nothing, ignore channel
                 else:
-                    self.time_tags.append([timestamps[i] * 1e-6, channel])
+                    self._time_tags.append([timestamps[i] * 1e-6, channel])
                 try:
                     self.sample_count[channels[i]] += 1
                 except:
                     pass # got nothing, ignore channel
 
-            #if not self.initialise_rates and self.rates_callback is not None \
-                #and now > self.next_rates_update:
             if self.rates_callback is not None and now > self.next_rates_update:
-                rates = self.grab_rates(now)
+                rates = self._get_rates(now)
                 if len(rates):
                     self.rates_callback(rates)
                 self._clear_rates(now)
 
-            #if not self.initialise_events and self.events_callback is not None \
             if self.events_callback is not None \
                and now > self.next_events_update:
-                time_tags = self.grab_time_tags()
+                time_tags = self._get_time_tags()
                 self.events_callback(time_tags)
                 self._clear_events(now)
 
     def _clear_events(self, now):
         if self.time_tags_per_channel:
-            self.time_tags = [[] for _ in range(len(self.event_channels))]
+            self._time_tags = [[] for _ in range(len(self.event_channels))]
         else:
-            self.time_tags = []
+            self._time_tags = []
         self.next_events_update = now + self.events_update_interval
 
     def _clear_rates(self, now):
@@ -237,10 +235,118 @@ class QuTAGController:
 
 class MockQuTAGController(QuTAGController):
 
+    
     def __init__(self):
         QuTAGController.__init__(self)
         self.rates = np.zeros(8)
         self.events = np.zeros(8)
 
+    def open_communication(self, update_interval):
+        self.update_interval = update_interval
+        self._initialised = True
 
-    
+    def close_communication(self):
+        self._initialised = False
+
+    def _get_time_stamps(self):
+        now = time.time()
+        time.sleep(0.01)
+        timestamps = []
+        channels = []
+        for channel in self.rate_channels:
+            arrival = self.last_timestamp[channel]
+            if arrival < now:
+                while True:
+                    p = random.random()
+                    arrival += -numpy.log(1.0 - p) / self.rates[channel]
+                    if arrival > now:
+                        break
+                    timestamps.append(arrival)
+                    channels.append(channel)
+                self.last_timestamp[channel] = arrival
+
+        return timestamps, channels, len(channels)
+
+    def start_rates(self, channels, callback=None, update_interval=None):
+        now = time.time()
+        self.last_timestamp = [now for _ in range(len(channels))]
+        super().start_rates(channels, callback, update_interval)
+
+
+class MockTAQuTAGController(QuTAGController):
+
+    # rewrite and place into ps ta plugin
+    def __init__(self):
+        QuTAGController.__init__(self)
+
+    def open_communication(self, update_interval):
+        self.update_interval = update_interval
+        self._initialised = True
+
+    def close_communication(self):
+        self._initialised = False
+
+    def next_time_stamp(self, previous, rate):
+        return previous - np.log(1.0 - random.random()) / rate        
+
+    def _get_time_stamps(self):
+        now = time.time()
+        time.sleep(0.01)
+        timestamps = []
+        channels = []
+        for channel in self.rate_channels:
+            arrival = self.last_timestamp[channel]
+            if arrival < now:
+                while True:
+                    arrival = \
+                        next_time_stamp(self, arrival, self.rates[channel])
+                    if arrival > now:
+                        break
+                    timestamps.append(arrival)
+                    channels.append(channel)
+                self.last_timestamp[channel] = arrival
+
+        return timestamps, channels, len(channels)
+
+    def start_rates(self, channels, callback=None, update_interval=None):
+        now = time.time()
+        self.last_timestamp = [now for _ in range(len(channels))]
+        super().start_rates(channels, callback, update_interval)
+
+
+if __name__ == '__main__':
+    import matplotlib.pyplot as plt
+    controller = MockTAQuTAGController()
+    times = [0]
+    n = 100000
+    for _ in range(n):
+        times.append(controller.next_time_stamp(times[-1], 100))
+
+    dt = 10
+    t_limit = dt
+    current = 0
+    rates = []
+    for t in times:
+        if t < t_limit:
+            current += 1
+        else:
+            rates.append(current)
+            t_limit += dt
+            current = 0
+    rates.append(current)
+
+    n = len(rates)
+    plt.plot(np.linspace(0, n-1, n) * dt, np.array(rates) / dt)
+    plt.show()
+
+    dt = 10
+    t_end = 1000
+    rate = 100
+
+    n = int(t_end / dt)
+    dt = t_end / n
+
+    t = 0
+    for i in range(n+1):
+        t = controller.next_time_stamp(t, 100))
+        
