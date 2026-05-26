@@ -55,15 +55,10 @@ class DAQ_1DViewer_Qutag(QutagCommonHistogram, DAQ_Viewer_base):
                 if not len(tags):
                     continue
                 hist = Histogram(self.n_bins, tags)
-                try:
-                    dfp = DataFromPlugins(name='qutag', data=hist.bins,
-                                          dim='Data1D',
-                                          labels=[self.channel_labels[channel]],
-                                          axes=[Axis(data=hist.centers, label='',
-                                                     units='', index=0)])
-                except:
-                    import pdb
-                    pdb.set_trace()
+                dfp = DataFromPlugins(name='qutag', data=hist.bins, dim='Data1D',
+                                      labels=[self.channel_labels[channel]],
+                                      axes=[Axis(data=hist.centers, label='',
+                                                 units='', index=0)])
                 data.append(dfp)
 
         self.dte_signal.emit(DataToExport(name='qutag', data=data))

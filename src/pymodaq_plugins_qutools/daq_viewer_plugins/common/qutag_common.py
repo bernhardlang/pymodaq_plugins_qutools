@@ -56,7 +56,8 @@ class QutagCommon:
               { 'title': 'Ch8', 'name': 'settings_ch8', 'type': 'group',
                 'expanded': False, 'children': channel_settings},
               ]
-          }]
+          },
+    ]
 
     live_mode_available = True
 
@@ -125,7 +126,7 @@ class QutagCommon:
             self.controller = QuTAGController()
             update_interval = self.settings.child('update_interval').value()
             self.controller.open_communication(update_interval)
-            initialized = self.controller.is_initialised()
+            initialized = self.controller.initialised
         else:
             self.controller = controller
             initialized = True
@@ -168,7 +169,7 @@ class QutagCommon:
     def determine_active_channels(self):
         channels = []
         for channel in range(1,9):
-            if not self.controller.get_enabled(channel):
+            if not self.controller.is_enabled(channel):
                 continue
             # <<-- revise this
             if self.settings.child("grab_enabled").value() \
@@ -198,7 +199,7 @@ class QutagCommonHistogram(QutagCommon):
         kwargs: dict
             others optionals arguments
         """
-        if not self.controller.collecting_events: # first call?
+        if self.controller.thread is None: # first call?
             channels = self.determine_active_channels()
             self.channel_labels = ['channel %d' % c for c in channels]
 
@@ -208,9 +209,7 @@ class QutagCommonHistogram(QutagCommon):
                 update_interval = self.settings.child("update_interval").value()
                 self.n_bins = self.settings.child("histogram_bins").value()
                 time_tags_per_channel = self.start_live()
-                self.controller.start_events(channels, self.callback,
-                                             update_interval,
-                                             time_tags_per_channel)
+                self.controller.start(channels, self.callback, update_interval)
             elif self.live:
                 self.live = False
                 self.controller.stop_events()
@@ -228,7 +227,6 @@ class QutagCommonHistogram(QutagCommon):
         self.controller.stop_events()
         self.emit_status(ThreadCommand('Update_Status', ['quTAG hist halted']))
         return ''
-
 
 
 class Histogram:
