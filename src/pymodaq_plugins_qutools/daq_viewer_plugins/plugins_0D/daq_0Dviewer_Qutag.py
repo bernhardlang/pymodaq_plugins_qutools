@@ -5,7 +5,8 @@ from pymodaq.control_modules.viewer_utility_classes import DAQ_Viewer_base, \
     comon_parameters, main
 from pymodaq_utils.utils import ThreadCommand
 from pymodaq.utils.data import DataFromPlugins
-from pymodaq_plugins_qutools.hardware.qutag_controller import QuTAGController
+from pymodaq_plugins_qutools.hardware.qutag_controller import QuTAGController, \
+    MockQuTAGController
 from pymodaq_plugins_qutools.daq_viewer_plugins.common.qutag_common \
     import QutagCommon
 
@@ -31,42 +32,60 @@ class DAQ_0DViewer_Qutag(QutagCommon, DAQ_Viewer_base):
         kwargs: dict
             others optionals arguments
         """
-        if not self.controller.measuring_rates:
-            channels = self.determine_active_channels()
-#            if len(channels) == 8:
-#                channels = channels[:-1]
-            self.channel_labels = ['channel %d' % c for c in channels]
-
         if 'live' in kwargs:
             if kwargs['live']:
                 self.live = True
-                update_interval = self.settings.child("update_interval").value()
-                self.controller.start_rates(channels, self.callback,
-                                            update_interval)
+                self.update_interval = self.settings['update_interval']
+                self.controller.start_rates(self.settings['channel'],
+                                            self.callback,
+                                            self.settings['use_channel_zero'],
+                                            self.update_interval)
             elif self.live:
                 self.live = False
-                self.controller.stop_rates()
+                self.controller.stop(self.settings['channel'])
             return
-
-        if not self.controller.measuring_rates:
-            self.controller.start_rates(channels)
-            return
-
-        rates = self.controller.grab_rates()
-        self.callback(rates)
 
     def callback(self, data):
-#        if len(data) == 8:
-#            data = data[:-1]
-        dfp = DataFromPlugins(name='qutag', data=data, dim='Data0D',
+        rate = len(data) / self.update_interval
+        dfp = DataFromPlugins(name='qutag', data=[rate] , dim='Data0D',
                               labels=self.channel_labels)
         self.dte_signal.emit(DataToExport(name='qutag', data=[dfp]))
 
     def stop(self):
         """Stop the current grab hardware wise if necessary"""
-        self.controller.stop_rates()
+        self.controller.stop(self.settings['channel'])
         self.emit_status(ThreadCommand('Update_Status', ['quTAG rate halted']))
         return ''
+
+
+class DAQ_0DViewer_MockQutag(DAQ_0DViewer_Qutag):
+
+    def ini_detector(self, controller=None):
+        """Detector communication initialization
+
+        Parameters
+        ----------
+        controller: (object)
+            custom object of a PyMoDAQ plugin (Slave case). None if only one
+            actuator/detector by controller (Master case)
+
+        Returns
+        -------
+        info: str
+        initialized: bool
+            False if initialization failed otherwise True
+        """
+
+        if self.is_master:
+            self.controller = MockQuTAGController()
+            self.controller.open_communication()
+            initialized = self.controller.initialised
+        else:
+            self.controller = controller
+            initialized = True
+
+        info = "Connected to MockQuTAG"
+        return info, initialized
 
 
 if __name__ == '__main__':

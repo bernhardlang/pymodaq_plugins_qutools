@@ -1,7 +1,17 @@
 import ctypes, random, time
 import numpy as np
-from threading import Thread
+from threading import Thread, Lock
 from pymodaq_plugins_qutools.hardware.QuTAG_HR import QuTAG
+
+
+channel_settings = [
+    { 'title': 'Signal Conditioning', 'name': 'signal_cond', 'type': 'list',
+      'limits': ['LVTTL', 'NIM', 'Misc'] },
+    { 'title': 'Trigger Edge', 'name': 'trigger_edge', 'type': 'list',
+      'limits': ['Rising', 'Falling'] },
+    { 'title': 'Trigger Threshold', 'name': 'trigger_threshold',
+      'type': 'float', 'min': -2, 'max': 3 },
+]
 
 
 class QuTAGController:
@@ -9,14 +19,22 @@ class QuTAGController:
     def __init__(self):
         self.initialised = False
         self.thread = None
+        self.update_intervals = [None for _ in range(9)]
+        self.last_updates = [None for _ in range(9)]
+        self.next_updates = [None for _ in range(9)]
+        self.callbacks = [None for _ in range(9)]
+        self.timestamps = [None for _ in range(9)]
+        self.last_channel_zero = [0 for _ in range(9)]
+        self.active_channels = 0
+        self.channel_zero_as_start = [False for _ in range(9)]
+        self.mutex = Lock()
 
-    def open_communication(self, update_interval):
+    def open_communication(self):
         try:
             self.qutag = QuTAG(buf_size=1000)
+            self.initialised = True
         except:
             raise RuntimeError("Couldn't initialise QuTAG")
-        self.update_interval = update_interval
-        self.initialised = True
 
     def close_communication(self):
         if self.initialised:
@@ -46,61 +64,103 @@ class QuTAGController:
             start_enabled = enable
         self.qutag.enableChannels(start_enabled, enabled_channels)
 
-    def start(self, channels, callback, update_interval):
+    def start_rate_zero(self, callback, update_interval):
+        self._start(0, callback, False, update_interval)
+
+    def stop_rate_zero(self):
+        if self.callbacks[0] is None:
+            return
+        self.callbacks[0] = None
+        self._stop_loop()
+
+    def start(self, channel, callback, channel_zero_as_start, update_interval):
         """Start measuring rates on channels."""
 
-        if self.thread is not None:
-            return
-        self.callback = callback
-        self.channels = channels
-        self.update_interval = update_interval
-        for channel in channels:
-            self.enable_channel(channel, True)
-        self._stop = False
-        self.thread = Thread(target=self._loop)
-        self.thread.start()
-        
-    def stop_events(self):
-        """Finish event recording and stop thread loop."""
-        if self.thread is None:
-            return
+        assert channel > 0 and channel < 9
+        self._start(channel, callback, channel_zero_as_start, update_interval)
 
-        self._stop = True
-        self.thread.join()
-        self.callback = None
-        self.thread = None
 
-    def _loop(self):
+    def _start(self, channel, callback, channel_zero_as_start, update_interval):
         if not self.initialised:
             return
-        self.events = []
-        self.next_update = time.time() + self.update_interval
+        assert self.callbacks[channel] is None
+
+        self.update_intervals[channel] = update_interval
+        self.timestamps[channel] = []
+        now = time.time()
+        self.last_updates[channel] = now
+        self.next_updates[channel] = now + update_interval
+
+        self.callbacks[channel] = callback
+        self.enable_channel(channel, True)
+        if channel:
+            self.channel_zero_as_start[channel] = channel_zero_as_start
+            if channel_zero_as_start:
+                self.enable_channel(0, True)
+        self._start_loop()
+        
+    def stop(self, channel):
+        """Finish event recording and stop thread loop."""
+
+        if self.callbacks[channel] is None:
+            return
+
+        self.set_enabled(channel, False)
+        self.callbacks[channel] = None
+        self.next_update[channel] = None
+        self._stop_loop()
+
+    def _start_loop(self):
+        with self.mutex:
+            self.active_channels += 1
+            if self.thread is None:
+                self.thread = Thread(target=self._loop)
+                self._stop = False
+                self.thread.start()
+
+    def _stop_loop(self):
+        with self.mutex:
+            self.active_channels -= 1
+            if not self.active_channels:
+                self._stop = True
+                self.thread.join()
+                self.thread = None
+
+    def _loop(self):
         while not self._stop:
             timestamps, channels, valid = self._get_time_stamps()
             now = time.time()
-            self.events += list(zip(timestamps[:valid], channels[:valid]))
+            for timestamp,channel in zip(timestamps[:valid], channels[:valid]):
+                if channel:
+                    channel -= 1
+                    if self.channel_zero_as_start[channel]:
+                        timestamp -= self.last_channel_zero
+                    self.timestamps[channel] = timestamp
+                else:
+                    self.last_channel_zero = timestamp
 
-            if now > self.next_update:
-                # send events on due time
-                self.callback(self.events)
-                self.events = []
+            for channel,next_update in enumerate(self.next_updates):
+                if next_update is None or now < next_update:
+                    continue
+                self.callbacks[channel](self.timestamps[channel],
+                                        now - self.last_updates[channel])
+                self.timestamps = []
+                self.last_update[channel] = now
 
     def _get_time_stamps(self):
-        """Read time stamps from device."""
+        """Read time stamps from device.
+        Returns tuple (timestamps, channels, valid)."""
 
-        timestamps, channels, valid = \
-            self.qutag.getLastTimestamps(reset=True)
-        now = time.time()
-        time.sleep(0.01)
-        return timestamps, channels, valid
+        return self.qutag.getLastTimestamps(reset=True)
 
 
 class MockQuTAGController(QuTAGController):
 
-    def open_communication(self, update_interval):
-        self.update_interval = update_interval
+    def open_communication(self):
         self.initialised = True
         self._enabled = [True for _ in range(9)]
+        self.rates = [1e4 for _ in range(9)]
+        self.last_timestamp = [None for _ in range(9)]
 
     def close_communication(self):
         if self.initialised:
@@ -119,17 +179,24 @@ class MockQuTAGController(QuTAGController):
         Includes starting event at time==t."""
 
         events = []
-        while t < to_time:
-            events.append(t)
-            t -= np.log(1.0 - random.random()) / rate
+        try:
+            while t < to_time:
+                events.append(t)
+                t -= np.log(1.0 - random.random()) / rate
+        except:
+            breakpoint()
         return events, t
 
-    def start(self, channels, callback, update_interval=None):
+    def start(self, channel, callback, update_interval):
         """Fill self.last_timestamp[channel] with nows and start recording."""
 
-        now = time.time()
-        self.last_timestamp = [now for _ in range(len(channels) + 1)]
-        super().start(channels, callback, update_interval)
+        assert channel > 0 and channel < 9
+        self.last_timestamp[channel] = time.time()
+        super().start(channel, callback, False, update_interval)
+
+    def start_rate_zero(self, callback, update_interval):
+        self.last_timestamp[0] = time.time()
+        super().start_rate_zero(callback, update_interval)
 
     def _get_time_stamps(self):
         """Generate events since self.last_timestamp[channel]."""
@@ -137,7 +204,9 @@ class MockQuTAGController(QuTAGController):
         now = time.time()
         timestamps = []
         channels = []
-        for channel in self.channels:
+        for channel in range(9):
+            if channel and self.callbacks[channel] is None:
+                continue
             events, self.last_timestamp[channel] = \
                 self.make_events(self.last_timestamp[channel], now,
                                  self.rates[channel])
