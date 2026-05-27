@@ -167,15 +167,13 @@ class QutagCommon:
             .child('get_count_rate').setValue(enable)
 
     def determine_active_channels(self):
-        channels = []
+        if self.settings["ch_one_as_start"] or not self.controller.is_enabled(0):
+            channels = []
+        else:
+            channels = [0]
+
         for channel in range(1,9):
-            if not self.controller.is_enabled(channel):
-                continue
-            # <<-- revise this
-            if self.settings.child("grab_enabled").value() \
-               or self.settings.child("line_settings") \
-                               .child("settings_ch%d" % channel) \
-                               .child("get_count_rate").value():
+            if self.controller.is_enabled(channel):
                 channels.append(channel)
         return channels
 
@@ -200,23 +198,25 @@ class QutagCommonHistogram(QutagCommon):
             others optionals arguments
         """
         if self.controller.thread is None: # first call?
-            channels = self.determine_active_channels()
-            self.channel_labels = ['channel %d' % c for c in channels]
+            self.active_channels = self.determine_active_channels()
+            self.channel_labels = \
+                ['channel %d' % c for c in self.active_channels]
 
         if 'live' in kwargs:
             if kwargs['live']:
                 self.live = True
                 update_interval = self.settings.child("update_interval").value()
                 self.n_bins = self.settings.child("histogram_bins").value()
-                time_tags_per_channel = self.start_live()
-                self.controller.start(channels, self.callback, update_interval)
+                self.start_live()
+                self.controller.start(self.active_channels, self.callback,
+                                      update_interval)
             elif self.live:
                 self.live = False
-                self.controller.stop_events()
+                self.controller.stop()
             return
 
         if not self.controller.collecting_events:
-            self.controller.start_events(channels)
+            self.controller.start_events(self.active_channels)
             return
 
         time_tags = self.controller.grab_time_tags()
@@ -247,11 +247,7 @@ class Histogram:
 
     def set_up(self, min_val, max_val):
         self._centers = np.linspace(min_val, max_val, self.n_bins)
-        try:
-            self.bin_width = self._centers[1] - self._centers[0]
-        except:
-            import pdb
-            pdb.set_trace()
+        self.bin_width = self._centers[1] - self._centers[0]
         self.ranges = \
             np.linspace(min_val - self.bin_width, max_val + self.bin_width,
                         self.n_bins + 1)
@@ -268,7 +264,10 @@ class Histogram:
             self.add(value)
 
     def add(self, value):
-        idx = int((value - self.start_range) / self.bin_width)
+        try:
+            idx = int((value - self.start_range) / self.bin_width)
+        except:
+            breakpoint()
         if idx >= 0:
             try:
                 self._bins[idx] += 1

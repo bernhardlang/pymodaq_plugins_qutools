@@ -16,7 +16,7 @@ class DAQ_1DViewer_MockQutag(DAQ_1DViewer_Qutag):
            { 'title': 'Rates', 'name': 'rates', 'type': 'group',
              'expanded': False, 'children': [
                  { 'title': 'Rate', 'name': f'rate_{i}', 'type': 'float',
-                   'min': 0, 'max': 1e9, 'default': 1e6 }
+                   'min': 0, 'max': 1e9, 'default': 1e4 }
                  for i in range(9) ]
              },
            ]
@@ -43,6 +43,6 @@ class DAQ_1DViewer_MockQutag(DAQ_1DViewer_Qutag):
             
 
 if __name__ == '__main__':
-    from PyQt6.QtCore import pyqtRemoveInputHook
-    pyqtRemoveInputHook() # to be able to use pdb inside Qt's event loops
+    #from qtpy.QtCore import pyqtRemoveInputHook
+    #pyqtRemoveInputHook() # to be able to use pdb inside Qt's event loops
     main(__file__)

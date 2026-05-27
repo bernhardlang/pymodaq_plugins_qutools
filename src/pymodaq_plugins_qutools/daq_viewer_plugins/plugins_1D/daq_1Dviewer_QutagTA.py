@@ -9,6 +9,7 @@ from pymodaq_plugins_qutools.hardware.qutag_controller import QuTAGController
 from pymodaq_plugins_qutools.daq_viewer_plugins.common.qutag_common \
     import QutagCommonHistogram, Histogram
 
+
 class DAQ_1DViewer_QutagTA(QutagCommonHistogram, DAQ_Viewer_base):
     """ Instrument plugin class for a quTAG 1D viewer in picosecond TA experiment.
     """
@@ -23,11 +24,10 @@ class DAQ_1DViewer_QutagTA(QutagCommonHistogram, DAQ_Viewer_base):
         self.live = False
 
     def start_live(self):
-        self.standalone = self.settings.child("standalone").value()
+        self.standalone = self.settings["standalone"]
         self.time_tags = []
         self.idx = 0
         self.tags_on_channel = np.empty(3)
-        return False
 
     def callback(self, incoming_time_tags):
         self.time_tags = self.time_tags + incoming_time_tags

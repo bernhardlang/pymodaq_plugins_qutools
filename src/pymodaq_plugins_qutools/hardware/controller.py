@@ -47,10 +47,10 @@ class QuTAGController:
         self.qutag.enableChannels(start_enabled, enabled_channels)
 
     def start(self, channels, callback, update_interval):
-        if self.thread is not None:
-            return
         """Start measuring rates on channels."""
 
+        if self.thread is not None:
+            return
         self.callback = callback
         self.channels = channels
         self.update_interval = update_interval
@@ -65,9 +65,9 @@ class QuTAGController:
         if self.thread is None:
             return
 
-        self.callback = None
         self._stop = True
         self.thread.join()
+        self.callback = None
         self.thread = None
 
     def _loop(self):
@@ -78,7 +78,7 @@ class QuTAGController:
         while not self._stop:
             timestamps, channels, valid = self._get_time_stamps()
             now = time.time()
-            self.events.append(list(zip(timestamps[:valid], channels[:valid])))
+            self.events += list(zip(timestamps[:valid], channels[:valid]))
 
             if now > self.next_update:
                 # send events on due time
@@ -148,6 +148,7 @@ class MockQuTAGController(QuTAGController):
         events = list(zip(timestamps, channels))
         events.sort()
         timestamps, channels = list(zip(*events))
+        timestamps, channels = list(timestamps), list(channels)
 
         time.sleep(0.01) # don't go too fast
         return timestamps, channels, len(channels)

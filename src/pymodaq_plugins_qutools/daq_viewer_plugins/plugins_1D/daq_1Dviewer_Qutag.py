@@ -25,8 +25,7 @@ class DAQ_1DViewer_Qutag(QutagCommonHistogram, DAQ_Viewer_base):
 
     def start_live(self):
         self.start_tag = 0
-        self.ch_one_as_start = self.settings.child("ch_one_as_start").value()
-        return not self.ch_one_as_start
+        self.ch_one_as_start = self.settings["ch_one_as_start"]
 
     def callback(self, incoming_tags):
         data = []
@@ -51,10 +50,15 @@ class DAQ_1DViewer_Qutag(QutagCommonHistogram, DAQ_Viewer_base):
                                                  units='', index=0)])
                 data.append(dfp)
         else:
-            for channel,tags in enumerate(incoming_tags):
-                if not len(tags):
-                    continue
-                hist = Histogram(self.n_bins, tags)
+            sorted_tags = [[] for _ in range(len(self.active_channels) + 1)]
+            for tag in incoming_tags:
+                try:
+                    sorted_tags[tag[1]].append(tag[0])
+                except:
+                    breakpoint()
+
+            for channel in self.active_channels:
+                hist = Histogram(self.n_bins, sorted_tags[channel])
                 dfp = DataFromPlugins(name='qutag', data=hist.bins, dim='Data1D',
                                       labels=[self.channel_labels[channel]],
                                       axes=[Axis(data=hist.centers, label='',
