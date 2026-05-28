@@ -10,16 +10,21 @@ class DAQ_1DViewer_MockQutag(DAQ_1DViewer_Qutag):
     """ Instrument plugin class for a simulated quTAG 1D viewer.
     """
 
-    params = QutagCommonHistogram.params \
-        + [{ 'title': 'Use channel one as start', 'name': 'ch_one_as_start',
-             'type': 'bool', 'value': False },
-           { 'title': 'Rates', 'name': 'rates', 'type': 'group',
-             'expanded': False, 'children': [
-                 { 'title': 'Rate', 'name': f'rate_{i}', 'type': 'float',
-                   'min': 0, 'max': 1e9, 'default': 1e4 }
-                 for i in range(9) ]
-             },
-           ]
+    params = DAQ_0DViewer_Qutag.params + [
+        { 'title': 'Rate [1/s]', 'name': 'rate', 'type': 'float', 'min': 1,
+          'value': 1e5 },
+        ]
+
+    params = comon_parameters + [
+        { 'title': 'Channel', 'name': 'channel', 'type': 'int', 'min': 1,
+          'max': 8, 'value': 1 },
+        { 'title': 'Update Interval [s]', 'name': 'update_interval',
+          'type': 'float', 'value': 1 },
+        { 'title': 'Histogram bins', 'name': 'n_bins', 'type': 'int', 'min': 1,
+          'value': 10 },
+       ] + channel_settings
+
+    simulate = True
 
     def ini_attributes(self):
         self.controller: MockQuTAGController = None

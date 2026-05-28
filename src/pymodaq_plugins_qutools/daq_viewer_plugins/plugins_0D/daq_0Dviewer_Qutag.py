@@ -22,8 +22,6 @@ class DAQ_0DViewer_Qutag(DAQ_Viewer_base):
           'type': 'float', 'value': 1 },
         { 'title': 'Use start input', 'name': 'start_zero', 'type': 'bool',
           'value': False },
-        { 'title': 'Histogram bins', 'name': 'n_bins', 'type': 'int', 'min': 1,
-          'value': 10 },
        ] + channel_settings
 
     live_mode_available = True
