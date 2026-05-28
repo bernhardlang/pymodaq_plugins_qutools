@@ -69,7 +69,6 @@ class DAQ_0DViewer_Qutag(DAQ_Viewer_base):
         if 'live' in kwargs:
             if kwargs['live']:
                 self.live = True
-                self.n_bins = self.settings['n_bins']
                 self.channel = self.settings['channel']
                 self.controller.start(self.settings['channel'], self.callback,
                                       False, self.settings['update_interval'])
@@ -88,36 +87,6 @@ class DAQ_0DViewer_Qutag(DAQ_Viewer_base):
         self.controller.stop(self.channel)
         self.emit_status(ThreadCommand('Update_Status', ['quTAG rate halted']))
         return ''
-
-
-class DAQ_0DViewer_MockQutag(DAQ_0DViewer_Qutag):
-
-    def ini_detector(self, controller=None):
-        """Detector communication initialization
-
-        Parameters
-        ----------
-        controller: (object)
-            custom object of a PyMoDAQ plugin (Slave case). None if only one
-            actuator/detector by controller (Master case)
-
-        Returns
-        -------
-        info: str
-        initialized: bool
-            False if initialization failed otherwise True
-        """
-
-        if self.is_master:
-            self.controller = MockQuTAGController()
-            self.controller.open_communication()
-            initialized = self.controller.initialised
-        else:
-            self.controller = controller
-            initialized = True
-
-        info = "Connected to MockQuTAG"
-        return info, initialized
 
 
 if __name__ == '__main__':
