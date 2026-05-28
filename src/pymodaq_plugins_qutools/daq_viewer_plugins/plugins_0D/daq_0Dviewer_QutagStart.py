@@ -6,7 +6,7 @@ from pymodaq.control_modules.viewer_utility_classes import DAQ_Viewer_base, \
 from pymodaq_utils.utils import ThreadCommand
 from pymodaq.utils.data import DataFromPlugins
 from pymodaq_plugins_qutools.hardware.controller import QuTAGController, \
-    channel_settings
+    MockQuTAGController, channel_settings
 
 
 class DAQ_0DViewer_QutagStart(DAQ_Viewer_base):
@@ -14,11 +14,10 @@ class DAQ_0DViewer_QutagStart(DAQ_Viewer_base):
     params = comon_parameters + [
         { 'title': 'Update Interval [s]', 'name': 'update_interval',
           'type': 'float', 'value': 1 },
-        { 'title': 'Histogram bins', 'name': 'histogram_bins', 'type': 'int',
-          'min': 2, 'value': 20 },
        ] + channel_settings
 
     live_mode_available = True
+    simulate = False
 
     def commit_settings(self, param: Parameter):
         """Apply the consequences of a change of value in the detector settings
@@ -53,7 +52,8 @@ class DAQ_0DViewer_QutagStart(DAQ_Viewer_base):
         """
 
         if self.is_master:
-            self.controller = QuTAGController()
+            self.controller = MockQuTAGController() if self.simulate else \
+                QuTAGController()
             self.controller.open_communication()
             initialized = self.controller.initialised
         else:
@@ -83,7 +83,6 @@ class DAQ_0DViewer_QutagStart(DAQ_Viewer_base):
         if 'live' in kwargs:
             if kwargs['live']:
                 self.live = True
-                self.n_bins = self.settings['histogram_bins']
                 self.controller.start_rate_zero(self.callback,
                                                 self.settings['update_interval'])
             elif self.live:
@@ -93,8 +92,8 @@ class DAQ_0DViewer_QutagStart(DAQ_Viewer_base):
 
     def callback(self, tags, dt):
         rate = len(tags) / dt
-        dfp = DataFromPlugins(name='qutag', data=[rate] , dim='Data0D',
-                              labels=self.channel_labels)
+        dfp = DataFromPlugins(name='qutag', data=[np.array([rate])],
+                              dim='Data0D', labels=[f'Start'])
         self.dte_signal.emit(DataToExport(name='qutag', data=[dfp]))
 
     def stop(self):

@@ -24,7 +24,7 @@ class QuTAGController:
         self.next_updates = [None for _ in range(9)]
         self.callbacks = [None for _ in range(9)]
         self.timestamps = [None for _ in range(9)]
-        self.last_channel_zero = [0 for _ in range(9)]
+        self.last_channel_zero = 0
         self.active_channels = 0
         self.channel_zero_as_start = [False for _ in range(9)]
         self.mutex = Lock()
@@ -79,7 +79,6 @@ class QuTAGController:
         assert channel > 0 and channel < 9
         self._start(channel, callback, channel_zero_as_start, update_interval)
 
-
     def _start(self, channel, callback, channel_zero_as_start, update_interval):
         if not self.initialised:
             return
@@ -105,9 +104,9 @@ class QuTAGController:
         if self.callbacks[channel] is None:
             return
 
-        self.set_enabled(channel, False)
+        self.enable_channel(channel, False)
         self.callbacks[channel] = None
-        self.next_update[channel] = None
+        self.next_updates[channel] = None
         self._stop_loop()
 
     def _start_loop(self):
@@ -131,21 +130,20 @@ class QuTAGController:
             timestamps, channels, valid = self._get_time_stamps()
             now = time.time()
             for timestamp,channel in zip(timestamps[:valid], channels[:valid]):
-                if channel:
-                    channel -= 1
-                    if self.channel_zero_as_start[channel]:
-                        timestamp -= self.last_channel_zero
-                    self.timestamps[channel] = timestamp
-                else:
+                if channel and self.channel_zero_as_start[channel]:
+                    timestamp -= self.last_channel_zero
+                self.timestamps[channel].append(timestamp)
+                if not channel:
                     self.last_channel_zero = timestamp
 
             for channel,next_update in enumerate(self.next_updates):
-                if next_update is None or now < next_update:
+                if next_update is None or now < next_update \
+                   or self.callbacks[channel] is None:
                     continue
                 self.callbacks[channel](self.timestamps[channel],
                                         now - self.last_updates[channel])
-                self.timestamps = []
-                self.last_update[channel] = now
+                self.timestamps[channel] = []
+                self.last_updates[channel] = now
 
     def _get_time_stamps(self):
         """Read time stamps from device.
@@ -179,20 +177,19 @@ class MockQuTAGController(QuTAGController):
         Includes starting event at time==t."""
 
         events = []
-        try:
-            while t < to_time:
-                events.append(t)
-                t -= np.log(1.0 - random.random()) / rate
-        except:
-            breakpoint()
+        while t < to_time:
+            events.append(t)
+            t -= np.log(1.0 - random.random()) / rate
         return events, t
 
-    def start(self, channel, callback, update_interval):
+    def start(self, channel, callback, channel_zero_as_start, update_interval):
         """Fill self.last_timestamp[channel] with nows and start recording."""
 
         assert channel > 0 and channel < 9
         self.last_timestamp[channel] = time.time()
-        super().start(channel, callback, False, update_interval)
+        if channel_zero_as_start and self.last_timestamp[0] is None:
+            self.last_timestamp[0] = time.time()
+        super().start(channel, callback, channel_zero_as_start, update_interval)
 
     def start_rate_zero(self, callback, update_interval):
         self.last_timestamp[0] = time.time()
@@ -205,7 +202,7 @@ class MockQuTAGController(QuTAGController):
         timestamps = []
         channels = []
         for channel in range(9):
-            if channel and self.callbacks[channel] is None:
+            if self.callbacks[channel] is None:
                 continue
             events, self.last_timestamp[channel] = \
                 self.make_events(self.last_timestamp[channel], now,
@@ -214,10 +211,11 @@ class MockQuTAGController(QuTAGController):
             channels += [channel for _ in range(len(events))]
 
         # bring lists into time order
-        events = list(zip(timestamps, channels))
-        events.sort()
-        timestamps, channels = list(zip(*events))
-        timestamps, channels = list(timestamps), list(channels)
+        if len(timestamps):
+            events = list(zip(timestamps, channels))
+            events.sort()
+            timestamps, channels = list(zip(*events))
+            timestamps, channels = list(timestamps), list(channels)
 
         time.sleep(0.01) # don't go too fast
         return timestamps, channels, len(channels)
