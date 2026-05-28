@@ -38,7 +38,7 @@ class Histogram:
     def add(self, value):
         idx = int((value - self.start_range) / self.bin_width)
         if idx >= 0 and idx < self.n_bins:
-        self._bins[idx] += 1
+            self._bins[idx] += 1
 
     def collect(self, values):
         for value in values:

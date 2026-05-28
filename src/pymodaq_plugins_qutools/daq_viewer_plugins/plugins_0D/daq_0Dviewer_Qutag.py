@@ -7,8 +7,6 @@ from pymodaq_utils.utils import ThreadCommand
 from pymodaq.utils.data import DataFromPlugins
 from pymodaq_plugins_qutools.hardware.controller import QuTAGController, \
     MockQuTAGController, channel_settings
-from pymodaq_plugins_qutools.daq_viewer_plugins.common.qutag_common \
-    import QutagCommon
 
 
 class DAQ_0DViewer_Qutag(DAQ_Viewer_base):
@@ -20,8 +18,6 @@ class DAQ_0DViewer_Qutag(DAQ_Viewer_base):
           'max': 8, 'value': 1 },
         { 'title': 'Update Interval [s]', 'name': 'update_interval',
           'type': 'float', 'value': 1 },
-        { 'title': 'Use start input', 'name': 'start_zero', 'type': 'bool',
-          'value': False },
        ] + channel_settings
 
     live_mode_available = True
@@ -76,8 +72,7 @@ class DAQ_0DViewer_Qutag(DAQ_Viewer_base):
                 self.n_bins = self.settings['n_bins']
                 self.channel = self.settings['channel']
                 self.controller.start(self.settings['channel'], self.callback,
-                                      self.settings['start_zero'],
-                                      self.settings['update_interval'])
+                                      False, self.settings['update_interval'])
             elif self.live:
                 self.live = False
                 self.controller.stop(self.settings['channel'])
