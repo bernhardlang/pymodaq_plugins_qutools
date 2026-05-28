@@ -1,5 +1,6 @@
 from pymodaq.control_modules.viewer_utility_classes import DAQ_Viewer_base, \
     comon_parameters
+from pymodaq_gui.parameter import Parameter
 from pymodaq_utils.utils import ThreadCommand
 from pymodaq_plugins_qutools.hardware.controller import QuTAGController, \
     MockQuTAGController, channel_settings
@@ -10,14 +11,32 @@ class QutagCommon(DAQ_Viewer_base):
     """
 
     params = comon_parameters + [
-        { 'title': 'Channel', 'name': 'channel', 'type': 'int', 'min': 1,
-          'max': 8, 'value': 1 },
         { 'title': 'Update Interval [s]', 'name': 'update_interval',
           'type': 'float', 'value': 1 },
        ] + channel_settings
 
     live_mode_available = True
     simulate = False
+
+    @property
+    def _channel(self):
+        return self.settings['channel']
+
+    def commit_settings(self, param: Parameter):
+        """Apply the consequences of a change of value in the detector settings
+
+        Parameters
+        ----------
+        param: Parameter
+            A given parameter (within detector_settings) whose value has been
+            changed by the user
+        """
+        if param.name() == "signal_cond":
+            self.controller.set_signal_conditioning(self._channel, param.value())
+        elif param.name() == "trigger_edge":
+            self.controller.set_trigger_edge(self._channel, param.value())
+        elif param.name() == "trigger_threshold":
+            self.controller.set_trigger_threshold(self._channel, param.value())
 
     def ini_detector(self, controller=None):
         """Detector communication initialization
@@ -60,16 +79,26 @@ class QutagCommon(DAQ_Viewer_base):
             others optionals arguments
         """
         if 'live' in kwargs:
+            channel = self._channel
             if kwargs['live']:
                 self.live = True
-                self.controller.start(self.settings['channel'], self.callback,
-                                      False, self.settings['update_interval'])
+                if channel:
+                    self.controller.start(self._channel, self.callback, False,
+                                          self.settings['update_interval'])
+                else:
+                    self.controller.start_rate_zero(self.callback,
+                                          self.settings['update_interval'])
             elif self.live:
                 self.live = False
-                self.controller.stop(self.settings['channel'])
+                self.controller.stop(self._channel)
 
     def stop(self):
         """Stop the current grab hardware wise if necessary"""
-        self.controller.stop(self.settings['channel'])
+        self.controller.stop(self._channel)
         self.emit_status(ThreadCommand('Update_Status', ['quTAG rate halted']))
         return ''
+
+    def close(self):
+        """Terminate the communication protocol"""
+        if self.is_master:
+            self.controller.close_communication()

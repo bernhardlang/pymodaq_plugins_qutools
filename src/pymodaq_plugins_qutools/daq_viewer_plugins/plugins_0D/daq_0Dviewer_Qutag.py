@@ -2,24 +2,22 @@ import numpy as np
 from pymodaq_data.data import DataToExport
 from pymodaq.control_modules.viewer_utility_classes import main
 from pymodaq.utils.data import DataFromPlugins
+from pymodaq_plugins_qutools\
+    .daq_viewer_plugins.plugins_0D.daq_0Dviewer_QutagStart \
+    import DAQ_0DViewer_QutagStart
 from pymodaq_plugins_qutools.common import QutagCommon
 from pymodaq_plugins_qutools.hardware.controller import QuTAGController, \
     MockQuTAGController, channel_settings
 
 
-class DAQ_0DViewer_Qutag(QutagCommon):
+class DAQ_0DViewer_Qutag(DAQ_0DViewer_QutagStart):
     """ Instrument plugin class for a quTAG OD viewer.
     """
 
-    def ini_attributes(self):
-        self.controller: QuTAGController = None
-
-    def callback(self, data, dt):
-        rate = len(data) / dt
-        dfp = DataFromPlugins(name='qutag', data=[np.array([rate])],
-                              dim='Data0D',
-                              labels=[f'Ch {self.settings['channel']}'])
-        self.dte_signal.emit(DataToExport(name='qutag', data=[dfp]))
+    params = [
+        { 'title': 'Channel', 'name': 'channel', 'type': 'int', 'min': 1,
+          'max': 8, 'value': 1 },
+        ] + QutagCommon.params
 
 
 if __name__ == '__main__':

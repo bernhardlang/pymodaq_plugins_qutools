@@ -67,12 +67,6 @@ class QuTAGController:
     def start_rate_zero(self, callback, update_interval):
         self._start(0, callback, False, update_interval)
 
-    def stop_rate_zero(self):
-        if self.callbacks[0] is None:
-            return
-        self.callbacks[0] = None
-        self._stop_loop()
-
     def start(self, channel, callback, channel_zero_as_start, update_interval):
         """Start measuring rates on channels."""
 
@@ -104,7 +98,8 @@ class QuTAGController:
         if self.callbacks[channel] is None:
             return
 
-        self.enable_channel(channel, False)
+        if channel:
+            self.enable_channel(channel, False)
         self.callbacks[channel] = None
         self.next_updates[channel] = None
         self._stop_loop()
@@ -190,7 +185,10 @@ class MockQuTAGController(QuTAGController):
     def start(self, channel, callback, channel_zero_as_start, update_interval):
         """Fill self.last_timestamp[channel] with nows and start recording."""
 
-        assert channel > 0 and channel < 9
+        try:
+            assert channel > 0 and channel < 9
+        except:
+            breakpoint()
         self.last_timestamp[channel] = time.time()
         self.zero_as_start |= channel_zero_as_start
         if channel_zero_as_start and self.last_timestamp[0] is None:
