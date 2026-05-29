@@ -22,11 +22,9 @@ class Histogram:
             self._changed = True
 
     def set_up(self, min_val, max_val):
-        self._centers = np.linspace(min_val, max_val, self.n_bins)
-        self.bin_width = self._centers[1] - self._centers[0]
-        self.ranges = \
-            np.linspace(min_val - self.bin_width, max_val + self.bin_width,
-                        self.n_bins + 1)
+        self.ranges = np.linspace(min_val, max_val, self.n_bins + 1)
+        self.bin_width = self.ranges[1] - self.ranges[0]
+        self._centers = self.ranges[:-1] + self.bin_width * 0.5
         self._bins = np.zeros(self.n_bins)
         self.start_range = self.ranges[0]
         self._changed = True

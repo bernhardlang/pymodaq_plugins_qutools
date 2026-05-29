@@ -156,6 +156,7 @@ class MockQuTAGController(QuTAGController):
         self.initialised = True
         self._enabled = [True for _ in range(9)]
         self.rates = [1e4 for _ in range(9)]
+        self.rates[0] = 1e3
         self.last_timestamp = [None for _ in range(9)]
         self.zero_as_start = False
 

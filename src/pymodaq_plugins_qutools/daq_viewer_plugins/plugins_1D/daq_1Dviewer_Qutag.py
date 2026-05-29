@@ -15,7 +15,7 @@ class DAQ_1DViewer_Qutag(QutagCommon):
         { 'title': 'Channel', 'name': 'channel', 'type': 'int', 'min': 1,
           'max': 8, 'value': 1 },
         { 'title': 'Histogram bins', 'name': 'n_bins', 'type': 'int',
-          'min': 2, 'value': 20 },
+          'min': 2, 'value': 100 },
         ] + QutagCommon.params
 
     simulate = False
