@@ -158,6 +158,7 @@ class MockQuTAGController(QuTAGController):
         self.rates = [1e4 for _ in range(9)]
         self.rates[0] = 1e3
         self.last_timestamp = [None for _ in range(9)]
+        self.external_trigger = False
         self.zero_as_start = False
 
     def close_communication(self):
@@ -177,12 +178,9 @@ class MockQuTAGController(QuTAGController):
         Includes starting event at time==t."""
 
         events = []
-        try:
-            while t < to_time:
-                events.append(t)
-                t -= np.log(1.0 - random.random()) / rate
-        except:
-            breakpoint()
+        while t < to_time:
+            events.append(t)
+            t -= np.log(1.0 - random.random()) / rate
         return events, t
 
     def start(self, channel, callback, channel_zero_as_start, update_interval):
@@ -206,11 +204,23 @@ class MockQuTAGController(QuTAGController):
         """Generate events since self.last_timestamp[channel]."""
 
         now = time.time()
-        timestamps = []
-        channels = []
-        for channel in range(9):
-            if self.callbacks[channel] is not None \
-               or (self.zero_as_start and not channel):
+        if self.external_trigger or self.callbacks[0]:
+            if self.external_trigger:
+                dt = 1 / self.rates[0]
+                n = int((now - self.last_timestamp[0]) / dt + 1)
+                timestamps = [self.last_timestamp[0] + i * dt for i in range(n)]
+            else:
+                events, self.last_timestamp[0] = \
+                    self.make_events(self.last_timestamp[0], now, self.rates[0])
+                timestamps = events
+            self.last_timestamp[0] = timestamps[-1]
+            channels = [0 for _ in range(len(timestamps))]
+        else:
+            timestamps = []
+            channels = []
+
+        for channel in range(1, 9):
+            if self.callbacks[channel] is not None:
                 events, self.last_timestamp[channel] = \
                     self.make_events(self.last_timestamp[channel], now,
                                      self.rates[channel])

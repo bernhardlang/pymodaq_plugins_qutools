@@ -9,6 +9,8 @@ class DAQ_0DViewer_MockQutagStart(DAQ_0DViewer_QutagStart):
     params = DAQ_0DViewer_QutagStart.params + [
         { 'title': 'Rate [1/s]', 'name': 'rate', 'type': 'float', 'min': 1,
           'value': 1e5 },
+        { 'title': 'External trigger', 'name': 'ext_trig', 'type': 'bool',
+          'default': False }
         ]
     
     simulate = True
@@ -24,6 +26,8 @@ class DAQ_0DViewer_MockQutagStart(DAQ_0DViewer_QutagStart):
         """
         if param.name() == "rate":
             self.controller.rates[0] = param.value()
+        elif param.name() == "ext_trig":
+            self.controller.external_trigger = param.value()
         else:
             super().commit_settings(param)
 
