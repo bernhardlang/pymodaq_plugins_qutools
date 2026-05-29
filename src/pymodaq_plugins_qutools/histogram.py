@@ -37,6 +37,7 @@ class Histogram:
         idx = int((value - self.start_range) / self.bin_width)
         if idx >= 0 and idx < self.n_bins:
             self._bins[idx] += 1
+            self._samples += 1
 
     def collect(self, values):
         for value in values:
@@ -46,6 +47,10 @@ class Histogram:
     def bins(self):
         self._update()
         return self._bins
+
+    @property
+    def samples(self):
+        return self._samples
 
     @property
     def centers(self):
@@ -76,7 +81,6 @@ class Histogram:
         if not self._changed:
             return
 
-        self._samples = sum(self._bins)
         self._normalised_bins = self._bins / (self._samples * self.bin_width)
         self._mean = \
             np.dot(self._normalised_bins, self._centers) * self.bin_width

@@ -11,9 +11,8 @@ rate = 1e4
 counts = []
 events = []
 t = 0
-for i in range(1,100):
+for i in range(1,101):
     count = 0
-    t = next_event(t, rate)
     while t < i:
         count += 1
         events.append(t)
