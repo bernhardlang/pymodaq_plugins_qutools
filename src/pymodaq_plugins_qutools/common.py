@@ -37,6 +37,20 @@ class QutagCommon(DAQ_Viewer_base):
             self.controller.set_trigger_edge(self._channel, param.value())
         elif param.name() == "trigger_threshold":
             self.controller.set_trigger_threshold(self._channel, param.value())
+        elif param.name() == "update_interval":
+            self.controller.update_intervals[self._channel] = param.value()
+        if param_name() == 'channel':
+            self._channel_changed()
+
+    def _channel_changed(self):
+        self.controller.set_signal_conditioning(self._channel,
+                                                self.settings['signal_cond'])
+        self.controller.set_trigger_edge(self._channel,
+                                         self.settings['trigger_edge'])
+        self.controller.set_trigger_threshold(self._channel,
+                                              self.settings['trigger_threshold'])
+        self.controller.update_intervals[self._channel] = \
+            self.settings['update_interval']
 
     def ini_detector(self, controller=None):
         """Detector communication initialization

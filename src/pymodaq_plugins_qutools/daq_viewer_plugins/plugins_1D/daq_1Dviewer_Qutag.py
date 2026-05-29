@@ -1,61 +1,24 @@
 import numpy as np
 from pymodaq_data.data import DataToExport, Axis
 from pymodaq_gui.parameter import Parameter
-from pymodaq.control_modules.viewer_utility_classes import DAQ_Viewer_base, \
-    comon_parameters, main
-from pymodaq_utils.utils import ThreadCommand
+from pymodaq.control_modules.viewer_utility_classes import main
 from pymodaq.utils.data import DataFromPlugins
-from pymodaq_plugins_qutools.hardware.controller import QuTAGController, \
-    MockQuTAGController, channel_settings
+from pymodaq_plugins_qutools.common import QutagCommon
 from pymodaq_plugins_qutools.histogram import Histogram
 
 
-class DAQ_1DViewer_Qutag(DAQ_Viewer_base):
+class DAQ_1DViewer_Qutag(QutagCommon):
     """ Instrument plugin class for a quTAG 1D viewer.
     """
 
-    params = comon_parameters + [
+    params = [
         { 'title': 'Channel', 'name': 'channel', 'type': 'int', 'min': 1,
           'max': 8, 'value': 1 },
-        { 'title': 'Update Interval [s]', 'name': 'update_interval',
-          'type': 'float', 'value': 1 },
         { 'title': 'Histogram bins', 'name': 'n_bins', 'type': 'int',
           'min': 2, 'value': 20 },
-        ] + channel_settings
+        ] + QutagCommon.params
 
     simulate = False
-
-    def ini_attributes(self):
-        self.controller: QuTAGController = None
-        self.live = False
-
-    def ini_detector(self, controller=None):
-        """Detector communication initialization
-
-        Parameters
-        ----------
-        controller: (object)
-            custom object of a PyMoDAQ plugin (Slave case). None if only one
-            actuator/detector by controller (Master case)
-
-        Returns
-        -------
-        info: str
-        initialized: bool
-            False if initialization failed otherwise True
-        """
-
-        if self.is_master:
-            self.controller = MockQuTAGController() if self.simulate else \
-                QuTAGController()
-            self.controller.open_communication()
-            initialized = self.controller.initialised
-        else:
-            self.controller = controller
-            initialized = True
-
-        info = "Connected to quTAG"
-        return info, initialized
 
     def grab_data(self, Naverage=1, **kwargs):
         """Start a grab from the detector
@@ -70,31 +33,25 @@ class DAQ_1DViewer_Qutag(DAQ_Viewer_base):
             others optionals arguments
         """
         if 'live' in kwargs:
+            channel = self._channel
+            self.n_bins = self.settings['n_bins']
             if kwargs['live']:
                 self.live = True
-                self.n_bins = self.settings['n_bins']
-                self.channel = self.settings['channel']
-                self.controller.start(self.settings['channel'], self.callback,
-                                      True, self.settings['update_interval'])
+                self.controller.start(self._channel, self.callback, True,
+                                      self.settings['update_interval'])
             elif self.live:
                 self.live = False
-                self.controller.stop(self.settings['channel'])
+                self.controller.stop(self._channel)
 
     def callback(self, tags, dt):
         hist = Histogram(self.n_bins, tags)
-
-        dfp = DataFromPlugins(name='qutag', data=hist.bins,
-                              dim='Data1D',
-                              labels=[f'Ch {self.channel}'],
+        dfp = DataFromPlugins(name='qutag', data=hist.bins, dim='Data1D',
+                              labels=[f'Ch {self._channel}'],
                               axes=[Axis(data=hist.centers, label='',
                                          units='', index=0)])
         self.dte_signal.emit(DataToExport(name='qutag', data=[dfp]))
 
-    def stop(self):
-        self.controller.stop(self.settings['channel'])
-        self.emit_status(ThreadCommand('Update_Status', ['quTAG halted']))
-        return ''
-        
+
 if __name__ == '__main__':
     from PyQt6.QtCore import pyqtRemoveInputHook
     pyqtRemoveInputHook() # to be able to use pdb inside Qt's event loops

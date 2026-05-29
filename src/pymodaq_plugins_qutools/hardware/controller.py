@@ -140,6 +140,8 @@ class QuTAGController:
                                         now - self.last_updates[channel])
                 self.timestamps[channel] = []
                 self.last_updates[channel] = now
+                self.next_updates[channel] = \
+                    now + self.update_intervals[channel]
 
     def _get_time_stamps(self):
         """Read time stamps from device.
