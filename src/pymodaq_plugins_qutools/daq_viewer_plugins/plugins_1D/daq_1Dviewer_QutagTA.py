@@ -5,33 +5,29 @@ from pymodaq.control_modules.viewer_utility_classes import DAQ_Viewer_base, \
     comon_parameters, main
 from pymodaq_utils.utils import ThreadCommand
 from pymodaq.utils.data import DataFromPlugins
-from pymodaq_plugins_qutools.hardware.qutag_controller import QuTAGController
-from pymodaq_plugins_qutools.daq_viewer_plugins.common.qutag_common \
-    import QutagCommonHistogram, Histogram
+from pymodaq_plugins_qutools.common QutagCommon
+from pymodaq_plugins_qutools.histogram Histogram
 
 
-class DAQ_1DViewer_QutagTA(QutagCommonHistogram, DAQ_Viewer_base):
+class DAQ_1DViewer_QutagTA(QutagCommon, DAQ_Viewer_base):
     """ Instrument plugin class for a quTAG 1D viewer in picosecond TA experiment.
     """
 
-    params = QutagCommonHistogram.params \
-     + [{ 'title': 'Stand-alone', 'name': 'standalone', 'type': 'bool',
-          'value': True },
-       ]
+    params = [
+        { 'title': 'Excitation laser', 'name': 'excitation', 'type': 'int',
+          'min': 1, 'max': 8, 'value': 1 },
+        { 'title': 'Probe laser', 'name': 'probe', 'type': 'int',
+          'min': 1, 'max': 8, 'value': 1 },
+        { 'title': 'Histogram bins', 'name': 'n_bins', 'type': 'int',
+          'min': 2, 'value': 100 },
+       ] + QutagCommon.params
 
     def ini_attributes(self):
         self.controller: QuTAGController = None
         self.live = False
 
-    def start_live(self):
-        self.standalone = self.settings["standalone"]
-        self.time_tags = []
-        self.idx = 0
-        self.tags_on_channel = np.empty(3)
-
-    def callback(self, incoming_time_tags):
-        self.time_tags = self.time_tags + incoming_time_tags
-        n_tt = len(self.time_tags)
+    def callback(self, tags, dt):
+        self.n_bins = self.settings['n_bins']
         self.hist_ps = Histogram(self.n_bins)
         self.hist_fs = Histogram(self.n_bins)
         self.hist_diff = Histogram(self.n_bins)

@@ -150,6 +150,103 @@ class QuTAGController:
         return self.qutag.getLastTimestamps(reset=True)
 
 
+class TAQuTAGController:
+
+    def __init__(self):
+        self.initialised = False
+        self.thread = None
+        self.update_interval = 1
+        self.excitation_channel = 1
+        self.probe_channel = 2
+        self.callback = None
+        self.mutex = Lock()
+
+    def open_communication(self):
+        try:
+            self.qutag = QuTAG(buf_size=1000)
+            self.initialised = True
+        except:
+            raise RuntimeError("Couldn't initialise QuTAG")
+
+    def close_communication(self):
+        if self.initialised:
+            self.stop_tagging()
+            self.qutag.deInitialize()
+            self.initialised = False
+
+    def is_enabled(self, channel):
+        """Return True if channel is enabled.
+        0: start, 1:-8 normal channels."""
+
+        start_enabled, enabled_channels = self.enabled_channels
+        if channel:
+            return enabled_channels[8 - channel] == '1'
+        return start_enabled
+
+    def enable_channel(self, channel, enable):
+        """Enable or disable channel.
+        0: start, 1:-8 normal channels."""
+
+        start_enabled, enabled_channels = self.get_enabled_channels()
+
+        if channel:
+            enabled_channels = \
+              replace_char(enabled_channels, 8 - channel, '1' if enable else '0')
+        else:
+            start_enabled = enable
+        self.qutag.enableChannels(start_enabled, enabled_channels)
+
+    def start(self, excitation_channel, probe_channel, callback):
+        with self.mutex:
+            if self.thread is not None:
+                return
+            self.excitation_channel = excitation_channel
+            self.probe_channel = probe_channel
+            self.callback = callback
+            self.thread = Thread(target=self._loop)
+            self._stop = False
+            self.thread.start()
+
+    def _loop(self):
+        items = []
+        while not self._stop:
+            timestamps, channels, valid = self._get_time_stamps()
+            now = time.time()
+            probe_laser = None
+            excitation_laser = None
+            for timestamp,channel in zip(timestamps[:valid], channels[:valid]):
+                if not channel:
+                    excitation_trigger = timestamp
+                elif excitation_trigger is None:
+                    continue
+
+                elif channel == self.excitation_channel:
+                    excitation_laser = timestamp - excitation_trigger
+                elif channel == self.probe_channel:
+                    if probe_laser is None:
+                        probe_laser = timestamp - excitation_trigger
+                else:
+                    continue
+
+                if excitation_laser is None or probe_laser is None:
+                    continue
+
+                items.append([excitation_laser, probe_laser])
+                probe_laser = None
+                excitation_laser = None
+
+            if now < next_update:
+                self.callback(items)
+                items = []
+                self.next_update = now + self.update_interval
+
+    def _get_time_stamps(self):
+        """Read time stamps from device.
+        Returns tuple (timestamps, channels, valid)."""
+
+        return self.qutag.getLastTimestamps(reset=True)
+        
+
 class MockQuTAGController(QuTAGController):
 
     def open_communication(self):
@@ -199,10 +296,7 @@ class MockQuTAGController(QuTAGController):
     def start(self, channel, callback, channel_zero_as_start, update_interval):
         """Fill self.last_timestamp[channel] with nows and start recording."""
 
-        try:
-            assert channel > 0 and channel < 9
-        except:
-            breakpoint()
+        assert channel > 0 and channel < 9
         self.last_timestamp[channel] = time.time()
         self.zero_as_start |= channel_zero_as_start
         if channel_zero_as_start and self.last_timestamp[0] is None:
@@ -244,7 +338,8 @@ class MockQuTAGController(QuTAGController):
                                          self.rates[channel],
                                          self.lifetimes[channel])
                 background_events, dummy = \
-                    self.make_events(timestamps[0], now, self.backgrounds[channel])
+                    self.make_events(timestamps[0], now,
+                                     self.backgrounds[channel])
             else:
                 lt = self.last_timestamp[channel]
                 events, self.last_timestamp[channel] = \
@@ -264,4 +359,54 @@ class MockQuTAGController(QuTAGController):
             timestamps, channels = list(timestamps), list(channels)
 
         time.sleep(0.01) # don't go too fast
+        return timestamps, channels, len(channels)
+
+
+class MockTAQuTAGController(QuTAGController):
+
+    def __init__(self):
+        super().__init__()
+        self.trigger_rate = 500
+        self.excitation_laser = 60e-6
+        self.excitation_jitter = 1e-6
+        self.probe_laser = 80e-6
+
+    def open_communication(self):
+        self.initialised = True
+
+    def close_communication(self):
+        if self.initialised:
+            self.stop_tagging()
+            self.initialised = False
+
+    @classmethod
+    def _get_pulse(cls, when, jitter):
+        return np.random.normal(when, jitter)
+
+    def _get_time_stamps(self):
+        now = time.time()
+        dt = 1 / self.trigger_rate
+        n = int((now - self.last_timestamp) / dt + 1)
+        start = self.last_timestamp
+        excitation = \
+            [self._get_pulse(start + i * dt + self.excitation_laser,
+                             self.excitation_jitter)
+             for i in n]
+        probe1 = \
+            [self._get_pulse(start + i * dt + self.probe_laser, 50e-12)
+             for i in n]
+        probe2 = \
+            [self._get_pulse(start + i * dt + self.probe_laser + dt / 2, 50e-12)
+             for i in n]
+        timestamps = excitation + probe1 + probe2
+        channels = \
+            [self.excitation_channel for _ in range(len(excitation))] \
+            + [self.probe_channel for _ in range(2 * len(probe1))]
+
+        if len(timestamps):
+            events = list(zip(timestamps, channels))
+            events.sort()
+            timestamps, channels = list(zip(*events))
+            timestamps, channels = list(timestamps), list(channels)
+
         return timestamps, channels, len(channels)

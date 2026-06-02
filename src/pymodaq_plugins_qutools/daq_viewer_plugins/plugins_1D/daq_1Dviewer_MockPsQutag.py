@@ -5,16 +5,16 @@ from pymodaq_plugins_qutools.daq_viewer_plugins.plugins_1D.daq_1Dviewer_Qutag \
     import DAQ_1DViewer_Qutag
 
 
-class DAQ_1DViewer_MockLifetimeQutag(DAQ_1DViewer_Qutag):
+class DAQ_1DViewer_MockPsQutag(DAQ_1DViewer_Qutag):
     """ Instrument plugin class for a simulated quTAG 1D viewer.
     """
 
     params = DAQ_1DViewer_Qutag.params + [
         { 'title': 'Rate [1/s]', 'name': 'rate', 'type': 'float', 'min': 1,
           'value': 1e3 },
-        { 'title': 'Lifetime [1/s]', 'name': 'lifetime', 'type': 'float',
+        { 'title': 'Delay [s]', 'name': 'delay', 'type': 'float',
           'min': 0, 'value': 1e-4 },
-        { 'title': 'Background [1/s]', 'name': 'background', 'type': 'float',
+        { 'title': 'Jitter [s]', 'name': 'jitter', 'type': 'float',
           'min': 0, 'value': 1e3 },
         ]
 
@@ -37,12 +37,10 @@ class DAQ_1DViewer_MockLifetimeQutag(DAQ_1DViewer_Qutag):
             channel = 0 if self.controller.lifetimes[self._channel] \
                 else self._channel
             self.controller.rates[channel] = param.value()
-        elif param.name() == "lifetime":
-            self.controller.lifetimes[self.settings['channel']] = param.value()
-            if param.value():
-                self.controller.rates[0] = self.controller.rates[self._channel]
-        elif param.name() == "background":
-            self.controller.backgrounds[self.settings['channel']] = param.value()
+        elif param.name() == "delay":
+            self.controller.delays[self.settings['channel']] = param.value()
+        elif param.name() == "jitter":
+            self.controller.jitter[self.settings['channel']] = param.value()
         else:
             super().commit_settings(param)
 
