@@ -20,29 +20,6 @@ class DAQ_1DViewer_Qutag(QutagCommon):
 
     simulate = False
 
-    def grab_data(self, Naverage=1, **kwargs):
-        """Start a grab from the detector
-
-        Parameters
-        ----------
-        Naverage: int
-            Number of hardware averaging (if hardware averaging is possible,
-            self.hardware_averaging should be set to
-            True in class preamble and you should code this implementation)
-        kwargs: dict
-            others optionals arguments
-        """
-        if 'live' in kwargs:
-            channel = self._channel
-            if kwargs['live']:
-                self._set_params()
-                self.live = True
-                self.controller.start(self._channel, self.callback, True,
-                                      self.settings['update_interval'])
-            elif self.live:
-                self.live = False
-                self.controller.stop(self._channel)
-
     def callback(self, tags, dt):
         hist = Histogram(self.n_bins, tags)
         dfp = DataFromPlugins(name='qutag', data=hist.bins, dim='Data1D',

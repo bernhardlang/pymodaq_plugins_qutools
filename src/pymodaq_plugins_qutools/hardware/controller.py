@@ -158,6 +158,7 @@ class MockQuTAGController(QuTAGController):
         self.rates = [1e4 for _ in range(9)]
         self.rates[0] = 1e3
         self.lifetimes = [0 for _ in range(9)]
+        self.backgrounds = [0 for _ in range(9)]
         self.last_timestamp = [None for _ in range(9)]
         self.external_trigger = False
         self.zero_as_start = False
@@ -187,10 +188,7 @@ class MockQuTAGController(QuTAGController):
     @classmethod
     def make_exp_events(cls, triggers, rate, lifetime):
         events = []
-        try:
-            events_per_trigger = rate * (triggers[-1] - triggers[0]) / len(triggers)
-        except:
-            breakpoint()
+        events_per_trigger = rate * (triggers[-1] - triggers[0]) / len(triggers)
         events = \
             [t + np.random.exponential(lifetime)
              for i in range(np.random.poisson(events_per_trigger))
@@ -245,10 +243,16 @@ class MockQuTAGController(QuTAGController):
                     self.make_exp_events(timestamps[:n_triggers],
                                          self.rates[channel],
                                          self.lifetimes[channel])
+                background_events, dummy = \
+                    self.make_events(timestamps[0], now, self.backgrounds[channel])
             else:
+                lt = self.last_timestamp[channel]
                 events, self.last_timestamp[channel] = \
                     self.make_events(self.last_timestamp[channel], now,
                                      self.rates[channel])
+                background_events, dummy = \
+                    self.make_events(lt, now, self.backgrounds[channel])
+            events += background_events
             timestamps += events
             channels += [channel for _ in range(len(events))]
 
