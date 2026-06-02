@@ -11,9 +11,9 @@ class DAQ_1DViewer_MockQutag(DAQ_1DViewer_Qutag):
 
     params = DAQ_1DViewer_Qutag.params + [
         { 'title': 'Rate [1/s]', 'name': 'rate', 'type': 'float', 'min': 1,
-          'value': 1e5 },
+          'value': 1e3 },
         { 'title': 'Lifetime [1/s]', 'name': 'lifetime', 'type': 'float',
-          'min': 0, 'value': 1, 'default': 0 },
+          'min': 0, 'value': 1e-4 },
         ]
 
     simulate = True
@@ -32,7 +32,13 @@ class DAQ_1DViewer_MockQutag(DAQ_1DViewer_Qutag):
             changed by the user
         """
         if param.name() == "rate":
-            self.controller.rates[self.settings['channel']] = param.value()
+            channel = 0 if self.controller.lifetimes[self._channel] \
+                else self._channel
+            self.controller.rates[channel] = param.value()
+        elif param.name() == "lifetime":
+            self.controller.lifetimes[self.settings['channel']] = param.value()
+            if param.value():
+                self.controller.rates[0] = self.controller.rates[self._channel]
         else:
             super().commit_settings(param)
 
@@ -46,7 +52,17 @@ class DAQ_1DViewer_MockQutag(DAQ_1DViewer_Qutag):
             initialized = True
 
         return "MockQutag plugin initialised", initialized
+
+    def _set_params(self):
+        super()._set_params()
+        self.controller.lifetimes[self._channel] = self.settings['lifetime']
+        channel = 0 if self.settings['lifetime'] else self._channel
+        self.controller.rates[channel] = self.settings['rate']
             
+    @property
+    def _external_trigger(self):
+        return self.settings['lifetime'] > 0
+
 
 if __name__ == '__main__':
     main(__file__)

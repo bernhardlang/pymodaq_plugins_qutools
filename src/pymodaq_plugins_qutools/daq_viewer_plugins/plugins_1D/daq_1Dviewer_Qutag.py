@@ -34,8 +34,8 @@ class DAQ_1DViewer_Qutag(QutagCommon):
         """
         if 'live' in kwargs:
             channel = self._channel
-            self.n_bins = self.settings['n_bins']
             if kwargs['live']:
+                self._set_params()
                 self.live = True
                 self.controller.start(self._channel, self.callback, True,
                                       self.settings['update_interval'])
@@ -50,6 +50,9 @@ class DAQ_1DViewer_Qutag(QutagCommon):
                               axes=[Axis(data=hist.centers, label='',
                                          units='', index=0)])
         self.dte_signal.emit(DataToExport(name='qutag', data=[dfp]))
+
+    def _set_params(self):
+        self.n_bins = self.settings['n_bins']
 
 
 if __name__ == '__main__':

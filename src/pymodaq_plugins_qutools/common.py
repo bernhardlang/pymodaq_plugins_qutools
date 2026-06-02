@@ -95,9 +95,11 @@ class QutagCommon(DAQ_Viewer_base):
         if 'live' in kwargs:
             channel = self._channel
             if kwargs['live']:
+                self._set_params()
                 self.live = True
                 if channel:
-                    self.controller.start(self._channel, self.callback, False,
+                    self.controller.start(self._channel, self.callback,
+                                          self._external_trigger,
                                           self.settings['update_interval'])
                 else:
                     self.controller.start_rate_zero(self.callback,
@@ -116,3 +118,10 @@ class QutagCommon(DAQ_Viewer_base):
         """Terminate the communication protocol"""
         if self.is_master:
             self.controller.close_communication()
+
+    def _set_params(self):
+        pass
+
+    @property
+    def _external_trigger(self):
+        return False
