@@ -157,6 +157,7 @@ class MockQuTAGController(QuTAGController):
         self._enabled = [True for _ in range(9)]
         self.rates = [1e4 for _ in range(9)]
         self.rates[0] = 1e3
+        self.lifetimes = [0 for _ in range(9)]
         self.last_timestamp = [None for _ in range(9)]
         self.external_trigger = False
         self.zero_as_start = False
@@ -182,6 +183,17 @@ class MockQuTAGController(QuTAGController):
             events.append(t)
             t -= np.log(1.0 - random.random()) / rate
         return events, t
+
+    @classmethod
+    def make_exp_events(cls, triggers, rate, lifetime):
+        events = []
+        events_per_trigger = rate * (triggers[-1] - triggers[0]) / len(triggers)
+        events = \
+            [t + np.random.exponential(lifetime)
+             for i in range(np.random.poisson(events_per_trigger))
+             for t in triggers]
+        events.sort()
+        return events
 
     def start(self, channel, callback, channel_zero_as_start, update_interval):
         """Fill self.last_timestamp[channel] with nows and start recording."""
@@ -214,18 +226,27 @@ class MockQuTAGController(QuTAGController):
                     self.make_events(self.last_timestamp[0], now, self.rates[0])
                 timestamps = events
             self.last_timestamp[0] = timestamps[-1]
-            channels = [0 for _ in range(len(timestamps))]
+            n_triggers = len(timestamps)
+            channels = [0 for _ in range(n_triggers)]
         else:
             timestamps = []
             channels = []
+            n_triggers = 0
 
         for channel in range(1, 9):
-            if self.callbacks[channel] is not None:
+            if self.callbacks[channel] is None:
+                continue
+            if self.lifetimes[channel]:
+                events = \
+                    self.make_exp_events(timestamps[:n_triggers],
+                                         self.rates[channel],
+                                         self.lifetimes[channel])
+            else:
                 events, self.last_timestamp[channel] = \
                     self.make_events(self.last_timestamp[channel], now,
                                      self.rates[channel])
-                timestamps += events
-                channels += [channel for _ in range(len(events))]
+            timestamps += events
+            channels += [channel for _ in range(len(events))]
 
         # bring lists into time order
         if len(timestamps):

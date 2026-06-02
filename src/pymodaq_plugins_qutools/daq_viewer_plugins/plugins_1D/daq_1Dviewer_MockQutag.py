@@ -12,6 +12,8 @@ class DAQ_1DViewer_MockQutag(DAQ_1DViewer_Qutag):
     params = DAQ_1DViewer_Qutag.params + [
         { 'title': 'Rate [1/s]', 'name': 'rate', 'type': 'float', 'min': 1,
           'value': 1e5 },
+        { 'title': 'Lifetime [1/s]', 'name': 'lifetime', 'type': 'float',
+          'min': 0, 'value': 1, 'default': 0 },
         ]
 
     simulate = True
