@@ -18,7 +18,7 @@ class DAQ_1DViewer_MockLifetimeQutag(DAQ_1DViewer_Qutag):
           'min': 0, 'value': 1e3 },
         ]
 
-    simulate = True
+    controller_type = MockQuTAGController
 
     def ini_attributes(self):
         self.controller: MockQuTAGController = None

@@ -10,8 +10,8 @@ class DAQ_0DViewer_MockQutag(DAQ_0DViewer_Qutag):
         { 'title': 'Rate [1/s]', 'name': 'rate', 'type': 'float', 'min': 1,
           'value': 1e5 },
         ]
-    
-    simulate = True
+
+    controller_type = MockQuTAGController
 
     def commit_settings(self, param: Parameter):
         """Apply the consequences of a change of value in the detector settings

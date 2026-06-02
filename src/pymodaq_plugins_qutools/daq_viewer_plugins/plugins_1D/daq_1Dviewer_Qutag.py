@@ -3,6 +3,7 @@ from pymodaq_data.data import DataToExport, Axis
 from pymodaq_gui.parameter import Parameter
 from pymodaq.control_modules.viewer_utility_classes import main
 from pymodaq.utils.data import DataFromPlugins
+from pymodaq_plugins_qutools.hardware.controller import QuTAGController
 from pymodaq_plugins_qutools.common import QutagCommon
 from pymodaq_plugins_qutools.histogram import Histogram
 
@@ -18,7 +19,7 @@ class DAQ_1DViewer_Qutag(QutagCommon):
           'min': 2, 'value': 100 },
         ] + QutagCommon.params
 
-    simulate = False
+    controller_type = QuTAGController
 
     def callback(self, tags, dt):
         hist = Histogram(self.n_bins, tags)

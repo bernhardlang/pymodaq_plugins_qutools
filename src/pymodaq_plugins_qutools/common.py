@@ -16,7 +16,6 @@ class QutagCommon(DAQ_Viewer_base):
        ] + channel_settings
 
     live_mode_available = True
-    simulate = False
 
     @property
     def _channel(self):
@@ -69,8 +68,7 @@ class QutagCommon(DAQ_Viewer_base):
         """
 
         if self.is_master:
-            self.controller = MockQuTAGController() if self.simulate else \
-                QuTAGController()
+            self.controller = self.controller_type()
             self.controller.open_communication()
             initialized = self.controller.initialised
         else:

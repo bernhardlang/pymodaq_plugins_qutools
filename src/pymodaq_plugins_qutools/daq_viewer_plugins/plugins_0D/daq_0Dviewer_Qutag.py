@@ -19,6 +19,7 @@ class DAQ_0DViewer_Qutag(DAQ_0DViewer_QutagStart):
           'max': 8, 'value': 1 },
         ] + QutagCommon.params
 
+    controller_type = QuTAGController
 
 if __name__ == '__main__':
     from PyQt5.QtCore import pyqtRemoveInputHook

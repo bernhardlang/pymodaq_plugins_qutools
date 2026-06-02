@@ -12,6 +12,8 @@ from pymodaq_plugins_qutools.hardware.controller import QuTAGController, \
 
 class DAQ_0DViewer_QutagStart(QutagCommon):
 
+    controller_type = QuTAGController
+
     @property
     def _channel(self):
         return 0

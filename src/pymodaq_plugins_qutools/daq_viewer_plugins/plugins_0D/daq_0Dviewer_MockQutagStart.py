@@ -13,7 +13,7 @@ class DAQ_0DViewer_MockQutagStart(DAQ_0DViewer_QutagStart):
           'default': False }
         ]
     
-    simulate = True
+    controller_type = MockQuTAGController
 
     def commit_settings(self, param: Parameter):
         """Apply the consequences of a change of value in the detector settings

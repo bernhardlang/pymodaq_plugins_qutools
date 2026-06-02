@@ -364,13 +364,6 @@ class MockQuTAGController(QuTAGController):
 
 class MockTAQuTAGController(QuTAGController):
 
-    def __init__(self):
-        super().__init__()
-        self.trigger_rate = 500
-        self.excitation_laser = 60e-6
-        self.excitation_jitter = 1e-6
-        self.probe_laser = 80e-6
-
     def open_communication(self):
         self.initialised = True
 
