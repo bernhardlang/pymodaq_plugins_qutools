@@ -98,11 +98,11 @@ class QuTAGController:
         if self.callbacks[channel] is None:
             return
 
+        self._stop_loop()
         if channel:
             self.enable_channel(channel, False)
         self.callbacks[channel] = None
         self.next_updates[channel] = None
-        self._stop_loop()
 
     def _start_loop(self):
         with self.mutex:
@@ -155,9 +155,6 @@ class TAQuTAGController:
     def __init__(self):
         self.initialised = False
         self.thread = None
-        self.update_interval = 1
-        self.excitation_channel = 1
-        self.probe_channel = 2
         self.callback = None
         self.mutex = Lock()
 
@@ -196,19 +193,34 @@ class TAQuTAGController:
             start_enabled = enable
         self.qutag.enableChannels(start_enabled, enabled_channels)
 
-    def start(self, excitation_channel, probe_channel, callback):
+    def start(self, excitation_channel, probe_channel, callback,
+              update_interval):
+        breakpoint()
         with self.mutex:
             if self.thread is not None:
                 return
             self.excitation_channel = excitation_channel
             self.probe_channel = probe_channel
             self.callback = callback
+            self.update_interval = update_interval
             self.thread = Thread(target=self._loop)
             self._stop = False
             self.thread.start()
 
+    def stop(self, channel):
+        """Finish event recording and stop thread loop."""
+
+        with self.mutex:
+            if self.callback is None:
+                return
+            self._stop = True
+            self.thread.join()
+            self.thread = None
+            self.callback = None
+
     def _loop(self):
         items = []
+        next_update = time.time() + self.update_interval
         while not self._stop:
             timestamps, channels, valid = self._get_time_stamps()
             now = time.time()
@@ -362,7 +374,7 @@ class MockQuTAGController(QuTAGController):
         return timestamps, channels, len(channels)
 
 
-class MockTAQuTAGController(QuTAGController):
+class MockTAQuTAGController(TAQuTAGController):
 
     def open_communication(self):
         self.initialised = True
@@ -378,6 +390,10 @@ class MockTAQuTAGController(QuTAGController):
 
     def _get_time_stamps(self):
         now = time.time()
+        if not hasattr(self, 'last_timestamp'):
+            self.last_timestamp = now
+            return [], [], 0
+
         dt = 1 / self.trigger_rate
         n = int((now - self.last_timestamp) / dt + 1)
         start = self.last_timestamp
@@ -401,5 +417,6 @@ class MockTAQuTAGController(QuTAGController):
             events.sort()
             timestamps, channels = list(zip(*events))
             timestamps, channels = list(timestamps), list(channels)
+            self.last_timestamp = timestamps[-1]
 
         return timestamps, channels, len(channels)

@@ -1,16 +1,16 @@
 from pymodaq_gui.parameter import Parameter
 from pymodaq.control_modules.viewer_utility_classes import main
 from pymodaq_plugins_qutools.hardware.controller import MockQuTAGController
-from pymodaq_plugins_qutools.daq_viewer_plugins.plugins_1D.daq_1Dviewer_Qutag \
-    import DAQ_1DViewer_Qutag
+from pymodaq_plugins_qutools.daq_viewer_plugins.plugins_1D.daq_1Dviewer_QutagTA \
+    import DAQ_1DViewer_QutagTA
 from pymodaq_plugins_qutools.hardware.controller import MockTAQuTAGController
 
 
-class DAQ_1DViewer_MockPsQutag(DAQ_1DViewer_Qutag):
+class DAQ_1DViewer_MockPsQutag(DAQ_1DViewer_QutagTA):
     """ Instrument plugin class for a simulated quTAG 1D viewer.
     """
 
-    params = DAQ_1DViewer_Qutag.params + [
+    params = DAQ_1DViewer_QutagTA.params + [
         { 'title': 'Rate [1/s]', 'name': 'rate', 'type': 'float', 'min': 1,
           'value': 1e3 },
         { 'title': 'Delay [s]', 'name': 'delay', 'type': 'float',

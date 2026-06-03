@@ -19,7 +19,10 @@ class QutagCommon(DAQ_Viewer_base):
 
     @property
     def _channel(self):
-        return self.settings['channel']
+        try:
+            return self.settings['channel']
+        except:
+            breakpoint()
 
     def commit_settings(self, param: Parameter):
         """Apply the consequences of a change of value in the detector settings
