@@ -16,7 +16,7 @@ class DAQ_1DViewer_MockPsQutag(DAQ_1DViewer_QutagTA):
         { 'title': 'Delay [s]', 'name': 'delay', 'type': 'float',
           'min': 0, 'value': 1e-4 },
         { 'title': 'Jitter [s]', 'name': 'jitter', 'type': 'float',
-          'min': 0, 'value': 1e3 },
+          'min': 0, 'value': 1e-6 },
         ]
 
     controller_type = MockTAQuTAGController

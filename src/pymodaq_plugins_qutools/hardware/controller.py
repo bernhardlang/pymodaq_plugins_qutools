@@ -150,123 +150,6 @@ class QuTAGController:
         return self.qutag.getLastTimestamps(reset=True)
 
 
-class TAQuTAGController:
-
-    def __init__(self):
-        self.initialised = False
-        self.thread = None
-        self.callback = None
-        self.mutex = Lock()
-
-    def open_communication(self):
-        try:
-            self.qutag = QuTAG(buf_size=1000)
-            self.initialised = True
-        except:
-            raise RuntimeError("Couldn't initialise QuTAG")
-
-    def close_communication(self):
-        if self.initialised:
-            self.stop_tagging()
-            self.qutag.deInitialize()
-            self.initialised = False
-
-    def is_enabled(self, channel):
-        """Return True if channel is enabled.
-        0: start, 1:-8 normal channels."""
-
-        start_enabled, enabled_channels = self.enabled_channels
-        if channel:
-            return enabled_channels[8 - channel] == '1'
-        return start_enabled
-
-    def enable_channel(self, channel, enable):
-        """Enable or disable channel.
-        0: start, 1:-8 normal channels."""
-
-        start_enabled, enabled_channels = self.get_enabled_channels()
-
-        if channel:
-            enabled_channels = \
-              replace_char(enabled_channels, 8 - channel, '1' if enable else '0')
-        else:
-            start_enabled = enable
-        self.qutag.enableChannels(start_enabled, enabled_channels)
-
-    def start(self, excitation_channel, probe_channel, callback,
-              update_interval):
-        with self.mutex:
-            if self.thread is not None:
-                return
-            self.excitation_channel = excitation_channel
-            self.probe_channel = probe_channel
-            self.callback = callback
-            self.update_interval = update_interval
-            self.thread = Thread(target=self._loop)
-            self._stop = False
-            self.thread.start()
-
-    def stop(self):
-        """Finish event recording and stop thread loop."""
-
-        with self.mutex:
-            if self.callback is None:
-                return
-            self._stop = True
-            self.thread.join()
-            self.thread = None
-            self.callback = None
-
-    def _loop(self):
-        excitation, probe = [], []
-        next_update = time.time() + self.update_interval
-        while not self._stop:
-            timestamps, channels, valid = self._get_time_stamps()
-            now = time.time()
-            probe_laser = None
-            excitation_laser = None
-            excitation_trigger = None
-            for timestamp,channel in zip(timestamps[:valid], channels[:valid]):
-#                print(timestamp,channel)
-                if not channel:
-                    excitation_trigger = timestamp
-#                    print("as excitation trigger")
-                elif excitation_trigger is None:
-#                    print("no excitation trigger yet, ignoring")
-                    continue
-                elif channel == self.excitation_channel:
-                    excitation_laser = timestamp - excitation_trigger
-#                    print("as excitation laser")
-                elif channel == self.probe_channel:
-                    if probe_laser is None:
-#                        print("as probe laser")
-                        probe_laser = timestamp - excitation_trigger
-                    else:
-#                        print("dropping second probe laser")
-                        continue
-
-                if excitation_laser is None or probe_laser is None:
-#                    print("at least one pulse missing")
-                    continue
-
-#                print("got all pulses")
-                excitation.append(excitation_laser)
-                probe.append(probe_laser)
-                probe_laser = None
-                excitation_laser = None
-
-            if now > next_update and len(excitation):
-                self.callback(excitation, probe)
-                excitation, probe = [], []
-                next_update = now + self.update_interval
-
-    def _get_time_stamps(self):
-        """Read time stamps from device.
-        Returns tuple (timestamps, channels, valid)."""
-
-        return self.qutag.getLastTimestamps(reset=True)
-        
-
 class MockQuTAGController(QuTAGController):
 
     def open_communication(self):
@@ -382,10 +265,121 @@ class MockQuTAGController(QuTAGController):
         return timestamps, channels, len(channels)
 
 
+class TAQuTAGController:
+
+    def __init__(self):
+        self.initialised = False
+        self.thread = None
+        self.callback = None
+        self.mutex = Lock()
+
+    def open_communication(self):
+        try:
+            self.qutag = QuTAG(buf_size=1000)
+            self.initialised = True
+        except:
+            raise RuntimeError("Couldn't initialise QuTAG")
+
+    def close_communication(self):
+        if self.initialised:
+            self.stop_tagging()
+            self.qutag.deInitialize()
+            self.initialised = False
+
+    def is_enabled(self, channel):
+        """Return True if channel is enabled.
+        0: start, 1:-8 normal channels."""
+
+        start_enabled, enabled_channels = self.enabled_channels
+        if channel:
+            return enabled_channels[8 - channel] == '1'
+        return start_enabled
+
+    def enable_channel(self, channel, enable):
+        """Enable or disable channel.
+        0: start, 1:-8 normal channels."""
+
+        start_enabled, enabled_channels = self.get_enabled_channels()
+
+        if channel:
+            enabled_channels = \
+              replace_char(enabled_channels, 8 - channel, '1' if enable else '0')
+        else:
+            start_enabled = enable
+        self.qutag.enableChannels(start_enabled, enabled_channels)
+
+    def start(self, excitation_channel, probe_channel, callback,
+              update_interval):
+        with self.mutex:
+            if self.thread is not None:
+                return
+            self.excitation_channel = excitation_channel
+            self.probe_channel = probe_channel
+            self.callback = callback
+            self.update_interval = update_interval
+            self.thread = Thread(target=self._loop)
+            self._stop = False
+            self.thread.start()
+
+    def stop(self):
+        """Finish event recording and stop thread loop."""
+
+        with self.mutex:
+            if self.callback is None:
+                return
+            self._stop = True
+            self.thread.join()
+            self.thread = None
+            self.callback = None
+
+    def _loop(self):
+        excitation, probe = [], []
+        next_update = time.time() + self.update_interval
+        while not self._stop:
+            timestamps, channels, valid = self._get_time_stamps()
+            now = time.time()
+            probe_laser = None
+            excitation_laser = None
+            excitation_trigger = None
+            for timestamp,channel in zip(timestamps[:valid], channels[:valid]):
+                if not channel:
+                    excitation_trigger = timestamp
+                elif excitation_trigger is None:
+                    continue
+                elif channel == self.excitation_channel:
+                    excitation_laser = timestamp - excitation_trigger
+                elif channel == self.probe_channel:
+                    if probe_laser is None:
+                        probe_laser = timestamp - excitation_trigger
+                    else:
+                        continue
+
+                if excitation_laser is None or probe_laser is None:
+                    continue
+
+                excitation.append(excitation_laser)
+                probe.append(probe_laser)
+                probe_laser = None
+                excitation_laser = None
+
+            if now > next_update and len(excitation):
+                self.callback(excitation, probe)
+                excitation, probe = [], []
+                next_update = now + self.update_interval
+
+    def _get_time_stamps(self):
+        """Read time stamps from device.
+        Returns tuple (timestamps, channels, valid)."""
+
+        return self.qutag.getLastTimestamps(reset=True)
+        
+
 class MockTAQuTAGController(TAQuTAGController):
 
     def open_communication(self):
         self.initialised = True
+        self.scheduled_timestamps = []
+        self.scheduled_channels = []
 
     def close_communication(self):
         if self.initialised:
@@ -396,38 +390,44 @@ class MockTAQuTAGController(TAQuTAGController):
     def _get_pulse(cls, when, jitter):
         return np.random.normal(when, jitter)
 
+    def _get_excitation(self, trigger):
+        return self._get_pulse(trigger + self.excitation_laser,
+                               self.excitation_jitter)
+        
+    def _get_probe(self, trigger):
+        return self._get_pulse(trigger + self.probe_laser, 50e-6)
+
+    def _schedule_item(self, trigger):
+        self.scheduled_timestamps += \
+            [trigger, self._get_excitation(trigger), self._get_probe(trigger),
+             self._get_probe(trigger + self.dt / 2)] 
+        self.scheduled_channels += [0, 1, 2, 2]
+        events = list(zip(self.scheduled_timestamps, self.scheduled_channels))
+        events.sort()
+        self.scheduled_timestamps, self.scheduled_channels = list(zip(*events))
+        self.scheduled_timestamps, self.scheduled_channels = \
+            list(self.scheduled_timestamps), list(self.scheduled_channels)
+        self.last_trigger = trigger
+
     def _get_time_stamps(self):
-        dt = 1 / self.trigger_rate
+        self.dt = 1 / self.trigger_rate
         now = time.time()
-        if not hasattr(self, 'next_trigger'):
-            self.next_trigger = now
-        trigger, excitation, probe1, probe2 = [], [], [], []
+        if not hasattr(self, 'last_trigger'):
+            self.last_trigger = now
+            self._schedule_item(now)
 
-        nope!
-        while self.next_trigger <= now:
-            trigger.append(self.next_trigger)
-            excitation.append(self._get_pulse(self.next_trigger
-                                              + self.excitation_laser,
-                                              self.excitation_jitter))
-            probe1.append(self._get_pulse(self.next_trigger + self.probe_laser,
-                                          50e-12))
-            probe2.append(self._get_pulse(self.next_trigger + self.probe_laser
-                                          + dt / 2,
-                                          50e-12))
-            self.next_trigger += dt
+        timestamps, channels = [], []
 
-        timestamps = trigger + excitation + probe1 + probe2
-        channels = \
-            [0 for _ in range(len(trigger))] \
-            + [self.excitation_channel for _ in range(len(excitation))] \
-            + [self.probe_channel for _ in range(2 * len(probe1))]
+        while self.scheduled_timestamps[0] <= now:
+            timestamp = self.scheduled_timestamps[0]
+            channel = self.scheduled_channels[0]
+            timestamps.append(timestamp)
+            channels.append(channel)
+            del self.scheduled_timestamps[0]
+            del self.scheduled_channels[0]
 
-        if len(timestamps):
-            events = list(zip(timestamps, channels))
-            events.sort()
-            timestamps, channels = list(zip(*events))
-            timestamps, channels = list(timestamps), list(channels)
-            self.last_timestamp = timestamps[-1]
+            if not len(self.scheduled_timestamps):
+                self._schedule_item(self.last_trigger + self.dt)
 
         time.sleep(0.01) # don't go too fast
         return timestamps, channels, len(channels)
