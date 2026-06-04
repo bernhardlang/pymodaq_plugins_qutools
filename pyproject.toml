@@ -15,6 +15,7 @@ dependencies = [
     "pymodaq>=4.3.0",
     "pymodaq_utils",
     "pymodaq_data",
+    "pytest",
 ]
 
 authors = [
