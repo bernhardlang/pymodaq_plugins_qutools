@@ -403,6 +403,7 @@ class MockTAQuTAGController(TAQuTAGController):
             self.next_trigger = now
         trigger, excitation, probe1, probe2 = [], [], [], []
 
+        nope!
         while self.next_trigger <= now:
             trigger.append(self.next_trigger)
             excitation.append(self._get_pulse(self.next_trigger
