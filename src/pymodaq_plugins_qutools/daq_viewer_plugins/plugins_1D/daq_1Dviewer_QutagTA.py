@@ -17,7 +17,7 @@ class DAQ_1DViewer_QutagTA(QutagCommon):
         { 'title': 'Excitation laser', 'name': 'excitation', 'type': 'int',
           'min': 1, 'max': 8, 'value': 1 },
         { 'title': 'Probe laser', 'name': 'probe', 'type': 'int',
-          'min': 1, 'max': 8, 'value': 1 },
+          'min': 1, 'max': 8, 'value': 2 },
         { 'title': 'Histogram bins', 'name': 'n_bins', 'type': 'int',
           'min': 2, 'value': 100 },
        ] + QutagCommon.params
@@ -44,39 +44,40 @@ class DAQ_1DViewer_QutagTA(QutagCommon):
             if kwargs['live']:
                 self._set_params()
                 self.live = True
-                self.controller.start(self.settings['excitation_laser'],
-                                      self.settings['probe_laser'],
-                                      self.callback,
+                self.controller.start(self.settings['excitation'],
+                                      self.settings['probe'], self.callback,
                                       self.settings['update_interval'])
             elif self.live:
                 self.live = False
                 self.controller.stop(self._channel)
 
-    def callback(self, items):
-        self.n_bins = self.settings['n_bins']
-        self.hist_ps = Histogram(self.n_bins)
-        self.hist_fs = Histogram(self.n_bins)
-        self.hist_diff = Histogram(self.n_bins)
+    def callback(self, excitation, probe):
+        n_bins = self.settings['n_bins']
+        hist_ps = Histogram(n_bins, excitation)
+        hist_fs = Histogram(n_bins, probe)
+        hist_diff = Histogram(n_bins, [p - e for p,e in zip(excitation, probe)])
 
-        for item in items:
-            self.hist_ps.add(item[0])
-            self.hist_fs.add(item[1])
-            self.hist_diff.add(item[1] - item[0])
-
-        excitation = DataFromPlugins(name='qutag', data=self.hist_ps.bins,
-                                     dim='Data1D', labels=['ch 0'],
-                                     axes=[Axis(data=self.hist_ps.centers,
+        excitation_data = DataFromPlugins(name='qutag', data=hist_ps.bins,
+                                          dim='Data1D', labels=['ch 0'],
+                                          axes=[Axis(data=hist_ps.centers,
+                                                   label='', units='', index=0)])
+        probe_data = DataFromPlugins(name='qutag', data=hist_fs.bins,
+                                     dim='Data1D', labels=['ch 1'],
+                                     axes=[Axis(data=hist_fs.centers,
                                                 label='', units='', index=0)])
-        probe = DataFromPlugins(name='qutag', data=self.hist_fs.bins,
-                                dim='Data1D', labels=['ch 1'],
-                                axes=[Axis(data=self.hist_fs.centers,
-                                           label='', units='', index=0)])
-        diff = DataFromPlugins(name='qutag', data=self.hist_diff.bins,
-                               dim='Data1D', labels=['difference'],
-                               axes=[Axis(data=self.hist_diff.centers,
-                                          label='', units='', index=0)])
+        diff_data = DataFromPlugins(name='qutag', data=hist_diff.bins,
+                                    dim='Data1D', labels=['difference'],
+                                    axes=[Axis(data=hist_diff.centers,
+                                               label='', units='', index=0)])
         self.dte_signal.emit(DataToExport(name='qutag',
-                                          data=[excitation, probe, diff]))
+                                          data=[excitation_data, probe_data,
+                                                diff_data]))
+
+    def stop(self):
+        """Stop the current grab hardware wise if necessary"""
+        self.controller.stop()
+        self.emit_status(ThreadCommand('Update_Status', ['quTAG rate halted']))
+        return ''
 
 
 if __name__ == '__main__':

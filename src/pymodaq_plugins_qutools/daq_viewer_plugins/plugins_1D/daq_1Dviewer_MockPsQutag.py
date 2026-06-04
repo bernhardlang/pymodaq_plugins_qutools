@@ -32,12 +32,8 @@ class DAQ_1DViewer_MockPsQutag(DAQ_1DViewer_QutagTA):
         self.controller.excitation_laser = \
             1 / (2 * trigger_rate) - self.settings['delay'] - 60e-6
         self.controller.excitation_jitter = self.settings['jitter']
+        self.controller.probe_laser = 1 / trigger_rate + 4e-6
 
-    def stop(self):
-        """Stop the current grab hardware wise if necessary"""
-        self.controller.stop()
-        self.emit_status(ThreadCommand('Update_Status', ['quTAG rate halted']))
-        return ''
 
 if __name__ == '__main__':
     main(__file__)

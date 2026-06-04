@@ -195,7 +195,6 @@ class TAQuTAGController:
 
     def start(self, excitation_channel, probe_channel, callback,
               update_interval):
-        breakpoint()
         with self.mutex:
             if self.thread is not None:
                 return
@@ -207,7 +206,7 @@ class TAQuTAGController:
             self._stop = False
             self.thread.start()
 
-    def stop(self, channel):
+    def stop(self):
         """Finish event recording and stop thread loop."""
 
         with self.mutex:
@@ -219,38 +218,47 @@ class TAQuTAGController:
             self.callback = None
 
     def _loop(self):
-        items = []
+        excitation, probe = [], []
         next_update = time.time() + self.update_interval
         while not self._stop:
             timestamps, channels, valid = self._get_time_stamps()
             now = time.time()
             probe_laser = None
             excitation_laser = None
+            excitation_trigger = None
             for timestamp,channel in zip(timestamps[:valid], channels[:valid]):
+#                print(timestamp,channel)
                 if not channel:
                     excitation_trigger = timestamp
+#                    print("as excitation trigger")
                 elif excitation_trigger is None:
+#                    print("no excitation trigger yet, ignoring")
                     continue
-
                 elif channel == self.excitation_channel:
                     excitation_laser = timestamp - excitation_trigger
+#                    print("as excitation laser")
                 elif channel == self.probe_channel:
                     if probe_laser is None:
+#                        print("as probe laser")
                         probe_laser = timestamp - excitation_trigger
-                else:
-                    continue
+                    else:
+#                        print("dropping second probe laser")
+                        continue
 
                 if excitation_laser is None or probe_laser is None:
+#                    print("at least one pulse missing")
                     continue
 
-                items.append([excitation_laser, probe_laser])
+#                print("got all pulses")
+                excitation.append(excitation_laser)
+                probe.append(probe_laser)
                 probe_laser = None
                 excitation_laser = None
 
-            if now < next_update:
-                self.callback(items)
-                items = []
-                self.next_update = now + self.update_interval
+            if now > next_update and len(excitation):
+                self.callback(excitation, probe)
+                excitation, probe = [], []
+                next_update = now + self.update_interval
 
     def _get_time_stamps(self):
         """Read time stamps from device.
@@ -389,27 +397,28 @@ class MockTAQuTAGController(TAQuTAGController):
         return np.random.normal(when, jitter)
 
     def _get_time_stamps(self):
-        now = time.time()
-        if not hasattr(self, 'last_timestamp'):
-            self.last_timestamp = now
-            return [], [], 0
-
         dt = 1 / self.trigger_rate
-        n = int((now - self.last_timestamp) / dt + 1)
-        start = self.last_timestamp
-        excitation = \
-            [self._get_pulse(start + i * dt + self.excitation_laser,
-                             self.excitation_jitter)
-             for i in n]
-        probe1 = \
-            [self._get_pulse(start + i * dt + self.probe_laser, 50e-12)
-             for i in n]
-        probe2 = \
-            [self._get_pulse(start + i * dt + self.probe_laser + dt / 2, 50e-12)
-             for i in n]
-        timestamps = excitation + probe1 + probe2
+        now = time.time()
+        if not hasattr(self, 'next_trigger'):
+            self.next_trigger = now
+        trigger, excitation, probe1, probe2 = [], [], [], []
+
+        while self.next_trigger <= now:
+            trigger.append(self.next_trigger)
+            excitation.append(self._get_pulse(self.next_trigger
+                                              + self.excitation_laser,
+                                              self.excitation_jitter))
+            probe1.append(self._get_pulse(self.next_trigger + self.probe_laser,
+                                          50e-12))
+            probe2.append(self._get_pulse(self.next_trigger + self.probe_laser
+                                          + dt / 2,
+                                          50e-12))
+            self.next_trigger += dt
+
+        timestamps = trigger + excitation + probe1 + probe2
         channels = \
-            [self.excitation_channel for _ in range(len(excitation))] \
+            [0 for _ in range(len(trigger))] \
+            + [self.excitation_channel for _ in range(len(excitation))] \
             + [self.probe_channel for _ in range(2 * len(probe1))]
 
         if len(timestamps):
@@ -419,4 +428,5 @@ class MockTAQuTAGController(TAQuTAGController):
             timestamps, channels = list(timestamps), list(channels)
             self.last_timestamp = timestamps[-1]
 
+        time.sleep(0.01) # don't go too fast
         return timestamps, channels, len(channels)
