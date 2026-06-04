@@ -14,9 +14,9 @@ class DAQ_1DViewer_QutagTA(QutagCommon):
     """
 
     params = [
-        { 'title': 'Excitation laser', 'name': 'excitation', 'type': 'int',
+        { 'title': 'Excitation channel', 'name': 'excitation', 'type': 'int',
           'min': 1, 'max': 8, 'value': 1 },
-        { 'title': 'Probe laser', 'name': 'probe', 'type': 'int',
+        { 'title': 'Probe channel', 'name': 'probe', 'type': 'int',
           'min': 1, 'max': 8, 'value': 2 },
         { 'title': 'Histogram bins', 'name': 'n_bins', 'type': 'int',
           'min': 2, 'value': 100 },

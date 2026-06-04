@@ -335,18 +335,19 @@ class TAQuTAGController:
     def _loop(self):
         excitation, probe = [], []
         next_update = time.time() + self.update_interval
+        probe_laser = None
+        excitation_laser = None
+        excitation_trigger = None
         while not self._stop:
             timestamps, channels, valid = self._get_time_stamps()
             now = time.time()
-            probe_laser = None
-            excitation_laser = None
-            excitation_trigger = None
             for timestamp,channel in zip(timestamps[:valid], channels[:valid]):
                 if not channel:
                     excitation_trigger = timestamp
-                elif excitation_trigger is None:
                     continue
-                elif channel == self.excitation_channel:
+                if excitation_trigger is None:
+                    continue
+                if channel == self.excitation_channel:
                     excitation_laser = timestamp - excitation_trigger
                 elif channel == self.probe_channel:
                     if probe_laser is None:
@@ -361,6 +362,7 @@ class TAQuTAGController:
                 probe.append(probe_laser)
                 probe_laser = None
                 excitation_laser = None
+                excitation_trigger = None
 
             if now > next_update and len(excitation):
                 self.callback(excitation, probe)
@@ -372,11 +374,12 @@ class TAQuTAGController:
         Returns tuple (timestamps, channels, valid)."""
 
         return self.qutag.getLastTimestamps(reset=True)
-        
+
 
 class MockTAQuTAGController(TAQuTAGController):
 
     def open_communication(self):
+        self.start_time = time.time()
         self.initialised = True
         self.scheduled_timestamps = []
         self.scheduled_channels = []
@@ -386,34 +389,41 @@ class MockTAQuTAGController(TAQuTAGController):
             self.stop_tagging()
             self.initialised = False
 
+    def current_time(self):
+        return time.time() - self.start_time
+
+
     @classmethod
     def _get_pulse(cls, when, jitter):
-        return np.random.normal(when, jitter)
+        return when + np.random.normal(0, jitter)
 
     def _get_excitation(self, trigger):
         return self._get_pulse(trigger + self.excitation_laser,
                                self.excitation_jitter)
         
     def _get_probe(self, trigger):
-        return self._get_pulse(trigger + self.probe_laser, 50e-6)
+        return self._get_pulse(trigger + self.probe_laser, 50e-12)
 
     def _schedule_item(self, trigger):
-        self.scheduled_timestamps += \
-            [trigger, self._get_excitation(trigger), self._get_probe(trigger),
-             self._get_probe(trigger + self.dt / 2)] 
-        self.scheduled_channels += [0, 1, 2, 2]
-        events = list(zip(self.scheduled_timestamps, self.scheduled_channels))
-        events.sort()
-        self.scheduled_timestamps, self.scheduled_channels = list(zip(*events))
-        self.scheduled_timestamps, self.scheduled_channels = \
-            list(self.scheduled_timestamps), list(self.scheduled_channels)
+        excitation = self._get_excitation(trigger)
+        probe1 = self._get_probe(trigger)
+        probe2 = self._get_probe(trigger + self.dt / 2)
+
+        if excitation > probe2:
+            self.scheduled_timestamps += [probe1, trigger, probe2, excitation]
+            self.scheduled_channels += [2, 0, 2, 1]
+        else:
+            self.scheduled_timestamps += [probe1, trigger, excitation, probe2]
+            self.scheduled_channels += [2, 0, 1, 2]
+
         self.last_trigger = trigger
 
     def _get_time_stamps(self):
-        self.dt = 1 / self.trigger_rate
-        now = time.time()
+        now = self.current_time()
+        if not hasattr(self, 'dt'):
+            self.dt = 1 / self.trigger_rate
         if not hasattr(self, 'last_trigger'):
-            self.last_trigger = now
+            self.last_trigger = now - self.dt
             self._schedule_item(now)
 
         timestamps, channels = [], []

@@ -12,9 +12,9 @@ class DAQ_1DViewer_MockPsQutag(DAQ_1DViewer_QutagTA):
 
     params = DAQ_1DViewer_QutagTA.params + [
         { 'title': 'Rate [1/s]', 'name': 'rate', 'type': 'float', 'min': 1,
-          'value': 1e3 },
-        { 'title': 'Delay [s]', 'name': 'delay', 'type': 'float',
-          'min': 0, 'value': 1e-4 },
+          'value': 500 },
+        { 'title': 'Delay [s]', 'name': 'delay', 'type': 'float', 'min': -1e-5,
+          'max': 1e-4, 'value': 0 },
         { 'title': 'Jitter [s]', 'name': 'jitter', 'type': 'float',
           'min': 0, 'value': 1e-6 },
         ]
@@ -30,9 +30,11 @@ class DAQ_1DViewer_MockPsQutag(DAQ_1DViewer_QutagTA):
         trigger_rate = self.settings['rate']
         self.controller.trigger_rate = trigger_rate
         self.controller.excitation_laser = \
-            1 / (2 * trigger_rate) - self.settings['delay'] - 60e-6
+            1 / (2 * trigger_rate) - self.settings['delay']
+        self.controller.excitation_trigger = \
+            self.controller.excitation_laser - 60e-6
         self.controller.excitation_jitter = self.settings['jitter']
-        self.controller.probe_laser = 1 / trigger_rate + 4e-6
+        self.controller.probe_laser = 4e-6
 
 
 if __name__ == '__main__':
